@@ -110,6 +110,8 @@ public class Core extends Plugin {
         getProxy().getPluginManager().registerListener(this, new PlayerJoin(this));
         getProxy().getPluginManager().registerListener(this, new PlayerQuit(this));
 
+        getProxy().getPluginManager().registerCommand(this, new Jump("jump"));
+
         if (config.getBoolean("Modules.ChatFilter.enabled"))
             getProxy().getPluginManager().registerListener(this, new ChatFilter(this));
 

@@ -5,8 +5,8 @@ import net.md_5.bungee.api.plugin.Command;
 
 public class Jump extends Command {
 
-    public Jump(String name, String permission, String... aliases) {
-        super(name, permission, aliases);
+    public Jump(String name) {
+        super(name);
     }
 
     @Override
