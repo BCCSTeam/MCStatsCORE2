@@ -4,7 +4,6 @@ import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.config.Configuration;
 import net.mcstats2.core.network.web.MCSData.MCSPlayerData;
 import net.mcstats2.core.network.web.RequestBuilder;
-import net.mcstats2.core.network.web.RequestResponse;
 
 import java.io.IOException;
 import java.sql.ResultSet;
@@ -50,7 +49,7 @@ public class MCSPlayer implements MCSEntity {
         for (MCSPlayerData.Response.CData datas : data.response.cdata)
             all.add(new CData(datas));
 
-        return all.toArray(new CData[all.size()]);
+        return all.toArray(new CData[0]);
     }
     public CData[] getCDatas(MCSPlayerData.CDataType type) {
         ArrayList<CData> all = new ArrayList<>();
@@ -59,7 +58,7 @@ public class MCSPlayer implements MCSEntity {
             if (datas.type.equals(type))
                 all.add(new CData(datas));
 
-        return all.toArray(new CData[all.size()]);
+        return all.toArray(new CData[0]);
     }
     public CData getCDataByID(String id) {
         for (CData cData : getCDatas())
@@ -159,14 +158,14 @@ public class MCSPlayer implements MCSEntity {
     public Warn createWarn(MCSEntity staff, String type, String expire) throws SQLException {
         String id = MCSCore.randomString(10);
 
-        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__warns`(`id`, `UUID`, `STAFF`, `type`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), type, expire)) != 0)
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__warns`(`id`, `UUID`, `STAFF`, `type`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), type, expire) != 0)
             return getWarn(id);
 
         return null;
     }
 
     public Warn getWarn(String id) throws SQLException {
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=? && `id`=? LIMIT 1", Arrays.asList(getUUID().toString(), id));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=? && `id`=? LIMIT 1", getUUID().toString(), id);
         if (rs.next())
             return new Warn(rs);
 
@@ -175,7 +174,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Warn> getWarns() throws SQLException {
         List<Warn> warns = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=?", Arrays.asList(getUUID().toString()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=?", getUUID().toString());
         while (rs.next())
             warns.add(new Warn(rs));
 
@@ -184,7 +183,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Warn> getWarnsByType(String type) throws SQLException {
         List<Warn> warns = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=? && `type`=?", Arrays.asList(getUUID().toString(), type));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=? && `type`=?", getUUID().toString(), type);
         while (rs.next())
             warns.add(new Warn(rs));
 
@@ -200,7 +199,7 @@ public class MCSPlayer implements MCSEntity {
         String id = MCSCore.randomString(10);
         int expire = t.getExpires().get(count);
 
-        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire)) != 0) {
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire) != 0) {
             Mute mute = getMute(id);
 
             HashMap<String, Object> replace = new HashMap<>();
@@ -246,7 +245,7 @@ public class MCSPlayer implements MCSEntity {
         if (text == null)
             text = "";
 
-        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes`(`id`, `UUID`, `STAFF`, `reason-text`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), text, expire)) != 0) {
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes`(`id`, `UUID`, `STAFF`, `reason-text`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), text, expire) != 0) {
             Mute mute = getMute(id);
 
             HashMap<String, Object> replace = new HashMap<>();
@@ -288,14 +287,14 @@ public class MCSPlayer implements MCSEntity {
     }
 
     public Mute getMute(String id) throws SQLException, InterruptedException, ExecutionException, IOException {
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `id`=? LIMIT 1", Arrays.asList(getUUID().toString(), id));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `id`=? LIMIT 1", getUUID().toString(), id);
         if (rs.next())
             return new Mute(rs);
 
         return null;
     }
     public Mute getActiveMute() throws SQLException, InterruptedException, ExecutionException, IOException {
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL) LIMIT 1", Arrays.asList(getUUID().toString()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL) LIMIT 1", getUUID().toString());
         if (rs.next())
             return new Mute(rs);
 
@@ -304,7 +303,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Mute> getMutes() throws SQLException, InterruptedException, ExecutionException, IOException {
         List<Mute> mutes = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=?", Arrays.asList(getUUID().toString()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=?", getUUID().toString());
         while (rs.next()) {
             mutes.add(new Mute(rs));
         }
@@ -314,7 +313,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Mute> getMutes(MCSCore.MuteTemplate reason) throws SQLException, InterruptedException, ExecutionException, IOException {
         List<Mute> mutes = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `reason`=?", Arrays.asList(getUUID().toString(), reason.getID()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `reason`=?", getUUID().toString(), reason.getID());
         while (rs.next()) {
             mutes.add(new Mute(rs));
         }
@@ -324,7 +323,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Mute> getMutesBySTAFF(MCSEntity staff) throws SQLException, InterruptedException, ExecutionException, IOException {
         List<Mute> mutes = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `STAFF`=?", Arrays.asList(getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `STAFF`=?", getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString());
         while (rs.next()) {
             mutes.add(new Mute(rs));
         }
@@ -341,7 +340,7 @@ public class MCSPlayer implements MCSEntity {
         String id = MCSCore.randomString(10);
         int expire = t.getExpires().get(count);
 
-        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__bans`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire)) != 0) {
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__bans`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire) != 0) {
             Ban ban = getBan(id);
 
             HashMap<String, Object> replace = new HashMap<>();
@@ -386,7 +385,7 @@ public class MCSPlayer implements MCSEntity {
         if (text == null)
             text = "";
 
-        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__bans`(`id`, `UUID`, `STAFF`, `reason-text`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(),text, expire)) != 0) {
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__bans`(`id`, `UUID`, `STAFF`, `reason-text`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(),text, expire) != 0) {
             Ban ban = getBan(id);
 
             HashMap<String, Object> replace = new HashMap<>();
@@ -427,14 +426,14 @@ public class MCSPlayer implements MCSEntity {
     }
 
     public Ban getBan(String id) throws SQLException, InterruptedException, ExecutionException, IOException {
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `id`=? LIMIT 1", Arrays.asList(getUUID().toString(), id));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `id`=? LIMIT 1", getUUID().toString(), id);
         if (rs.next())
             return new Ban(rs);
 
         return null;
     }
     public Ban getActiveBan() throws SQLException, InterruptedException, ExecutionException, IOException {
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL) LIMIT 1", Arrays.asList(getUUID().toString()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL) LIMIT 1", getUUID().toString());
         if (rs.next())
             return new Ban(rs);
 
@@ -443,7 +442,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Ban> getBans() throws SQLException, InterruptedException, ExecutionException, IOException {
         List<Ban> bans = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=?", Arrays.asList(getUUID().toString()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=?", getUUID().toString());
         while (rs.next()) {
             bans.add(new Ban(rs));
         }
@@ -453,7 +452,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Ban> getBans(MCSCore.BanTemplate reason) throws SQLException, InterruptedException, ExecutionException, IOException {
         List<Ban> bans = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `reason`=?", Arrays.asList(getUUID().toString(), reason.getID()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `reason`=?", getUUID().toString(), reason.getID());
         while (rs.next()) {
             bans.add(new Ban(rs));
         }
@@ -463,7 +462,7 @@ public class MCSPlayer implements MCSEntity {
     public List<Ban> getBans(MCSEntity staff) throws SQLException, InterruptedException, ExecutionException, IOException {
         List<Ban> bans = new ArrayList<>();
 
-        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `STAFF`=?", Arrays.asList(getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString()));
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `STAFF`=?", getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString());
         while (rs.next()) {
             bans.add(new Ban(rs));
         }
@@ -837,7 +836,7 @@ public class MCSPlayer implements MCSEntity {
         }
 
         public boolean delete() {
-            return MCSCore.getInstance().getMySQL().queryUpdate("UPDATE MCSCore__mutes SET valid=0 WHERE id=? && UUID=?", Arrays.asList(getID(), getUUID().toString())) != 0;
+            return MCSCore.getInstance().getMySQL().queryUpdate("UPDATE MCSCore__mutes SET valid=0 WHERE id=? && UUID=?", getID(), getUUID().toString()) != 0;
         }
     }
     public class Ban {
@@ -903,7 +902,7 @@ public class MCSPlayer implements MCSEntity {
         }
 
         public boolean delete() {
-            return MCSCore.getInstance().getMySQL().queryUpdate("UPDATE MCSCore__bans SET valid=0 WHERE id=? && UUID=?", Arrays.asList(getID(), getUUID().toString())) != 0;
+            return MCSCore.getInstance().getMySQL().queryUpdate("UPDATE MCSCore__bans SET valid=0 WHERE id=? && UUID=?", getID(), getUUID().toString()) != 0;
         }
     }
 }
