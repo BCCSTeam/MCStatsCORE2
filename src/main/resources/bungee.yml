@@ -1,0 +1,25 @@
+name: MCStatsCORE2
+version: 1.0
+
+author: BCCS-Team
+authors: []
+website: https://www.mcstats.net
+
+main: net.mcstats2.bridge.server.bungee.Core
+commands:
+  mcstats:
+    usage: </command>
+  info:
+    usage: </command>
+  kick:
+    usage: </command>
+  mute:
+    usage: </command>
+  ban:
+    usage: </command>
+  cmute:
+    usage: </command>
+  cban:
+    usage: </command>
+  alt:
+    usage: </command>

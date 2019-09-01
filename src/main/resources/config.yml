@@ -1,0 +1,182 @@
+MySQL:
+  hostname: 'localhost'
+  port: 3306
+  database: 'MCS'
+  username: 'MCS'
+  password: 'pass123'
+
+Modules:
+  Legally:
+    enabled: true
+    needToAccept: true
+    onNotAccepted:
+      diallow-movements: true
+      disable-chat: true
+    message:
+      - ''
+
+  #
+  # ChatFilter-System
+  # Bypass: MCStatsNET.chat.chat.filter.bypass
+  # Alert: MCStatsNET.chat.chat.filter.alert
+  # ChatColor: MCStatsNET.chat.color
+  #
+  ChatFilter:
+    enabled: true
+    commands:
+      - '/msg'
+      - '/r'
+      - '/cc'
+      - '/me'
+
+    block_UTF-8: true
+
+    spam:
+      enabled: true
+      delay: 1
+      auto-kick:
+        enabled: true
+        points: 3
+        reason: 'Spaming'
+      auto-mute:
+        enabled: true
+        points: 10
+        reason: 'Spaming'
+      auto-ban:
+        enabled: true
+        points: 20
+        reason: 'Spaming'
+        expire: 900
+
+    repeating:
+      enabled: true
+      history: 5
+
+    badwords:
+      enabled: true
+      auto-kick:
+        enabled: true
+        points: 3
+        reason: 'Spaming'
+      auto-mute:
+        enabled: true
+        points: 10
+        reason: 'Spaming'
+      auto-ban:
+        enabled: true
+        points: 20
+        reason: 'Spaming'
+        expire: 900
+
+    address:
+      enabled: true
+      whitelist:
+        - '*.mcstats.net'
+
+    adverse:
+      score: 3
+      auto-kick:
+        enabled: true
+        points: 3
+        reason: 'Spaming'
+      auto-mute:
+        enabled: true
+        points: 10
+        reason: 'Spaming'
+      auto-ban:
+        enabled: true
+        points: 20
+        reason: 'Spaming'
+        expire: 900
+
+  #
+  # AccountLimiter
+  # Bypass: MCStatsNET.AccountLimiter.bypass
+  # Alert: MCStatsNET.AccountLimiter.alert
+  # MaxAccounts: MCStatsNET.AccountLimiter.max.<1-255>
+  #
+  AccountLimiter:
+    enabled: true
+    default-max: 3
+    auto-ban:
+      enabled: true
+      reason: 'Multi Accounts'
+      expire: 0
+
+  #
+  # AntiVPN-System
+  # Bypass: MCStatsNET.AntiVPN.bypass
+  # Alert: MCStatsNET.AntiVPN.alert
+  #
+  AntiVPN:
+    enabled: true
+    auto-ban:
+      enabled: false
+      reason: 'VPN/Proxy'
+      expire: 10800
+
+  #
+  # SkinChecker-System
+  # Bypass: MCStatsNET.SkinChecker.bypass
+  # Alert: MCStatsNET.SkinChecker.alert
+  #
+  SkinChecker:
+    enabled: true
+    auto-ban:
+      enabled: true
+      reason: 'Bad Skin'
+      expire: 900
+
+
+  #
+  # Mute-System
+  # Bypass: MCStatsNET.kick.bypass
+  # Alert: MCStatsNET.kick.alert
+  # Power: MCStatsNET.kick.power.<1-255>
+  #
+  Kick:
+    enabled: true
+
+  #
+  # Mute-System
+  # Bypass: MCStatsNET.mute.bypass
+  # Alert: MCStatsNET.mute.alert
+  # Power: MCStatsNET.mute.power.<1-255>
+  # Template: MCStatsNET.mute.template
+  # Template Power: MCStatsNET.mute.template.power.<1-255>
+  # Custom: MCStatsNET.mute.custom
+  #
+  Mute:
+    enabled: true
+
+  #
+  # Ban-System
+  # Bypass: MCStatsNET.ban.bypass
+  # Alert: MCStatsNET.ban.alert
+  # Power: MCStatsNET.ban.power.<1-255>
+  # Template: MCStatsNET.ban.template
+  # Template Power: MCStatsNET.ban.template.power.<1-255>
+  # Custom: MCStatsNET.ban.custom
+  #
+  Ban:
+    enabled: true
+
+  #
+  # Global Mute-System
+  # Bypass: MCStatsNET.gmute.bypass
+  # Alert: MCStatsNET.gmute.alert
+  #
+  # Global Mutes are made by the MCStats.net system!
+  #
+  gMute:
+    enabled: true
+
+  #
+  # Global Ban-System
+  # Bypass: MCStatsNET.gban.bypass
+  # Alert: MCStatsNET.gban.alert
+  #
+  # Global Bans are made by the MCStats.net system!
+  #
+  gBan:
+    enabled: true

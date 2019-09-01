@@ -1,0 +1,4 @@
+name: MCStatsCORE2
+author: BCCS-Team
+version: 1.0
+main: net.mcstats.bridge.cloud.timocloud.Core

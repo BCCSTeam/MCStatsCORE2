@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.mcstats2</groupId>
+    <artifactId>MCStatsCORE2</artifactId>
+    <version>1.1</version>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.3</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+            </plugin>
+
+
+            <!--<plugin>
+                <groupId>com.github.wvengen</groupId>
+                <artifactId>proguard-maven-plugin</artifactId>
+                <version>2.0.14</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>net.sf.proguard</groupId>
+                        <artifactId>proguard-base</artifactId>
+                        <version>5.3.3</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>proguard</goal></goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <proguardVersion>5.3.3</proguardVersion>
+                    <options>
+                        <option>-allowaccessmodification</option>
+                        <option>-dontshrink</option>
+                        <option>-dontoptimize</option>
+                        <option>-dontpreverify</option>
+                        <option>-dontnote</option>
+                        <option>-keep class net.mcstats.server.bukkit.Core</option>
+                        <option>-keep class net.mcstats.server.bungee.Core</option>
+                    </options>
+
+
+                    <assembly>
+                        <inclusions>
+                            <inclusion>
+                                <groupId>org.apache.httpcomponents</groupId><artifactId>httpasyncclient</artifactId><library>true</library>
+                            </inclusion>
+
+                            <inclusion>
+                                <groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><library>true</library>
+                            </inclusion>
+                        </inclusions>
+                    </assembly>
+
+                    <libs>
+                        <lib>${java.home}/lib/rt.jar</lib>
+                        <lib>${java.home}/lib/jsse.jar</lib>
+                    </libs>
+                </configuration>
+            </plugin>-->
+        </plugins>
+    </build>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <repositories>
+        <!--<repository>
+            <id>leonenneken</id>
+            <url>http://maven.leonenneken.io/content/repositories/minecraft/</url>
+        </repository>
+
+       <repository>
+            <id>gravity-repo</id>
+            <url>http://repo.gravitydevelopment.net</url>
+        </repository>-->
+
+        <repository>
+            <id>mcstats-maven</id>
+            <url>https://maven.mcstats.net</url>
+        </repository>
+
+        <repository>
+            <id>cloudnet</id>
+            <url>https://cloudnetservice.eu/repositories/</url>
+        </repository>
+
+        <repository>
+            <id>TimoCloud-API</id>
+            <url>https://maven.timo.cloud/repository/TimoCloud-API/</url>
+        </repository>
+
+        <repository>
+            <id>clojars</id>
+            <url>http://clojars.org/repo/</url>
+        </repository>
+
+        <repository>
+            <id>sonatype-snapshots</id>
+            <name>sonatype snapshots repo</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.spigotmc</groupId>
+            <artifactId>spigot</artifactId>
+            <version>1.8</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>net.md-5</groupId>
+            <artifactId>bungeecord-api</artifactId>
+            <version>1.8-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>de.dytanic.cloudnet</groupId>
+            <artifactId>cloudnet-core</artifactId>
+            <version>2.1.10</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>cloud.timo.TimoCloud</groupId>
+            <artifactId>TimoCloud-API</artifactId>
+            <version>5.3.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpasyncclient</artifactId>
+            <version>4.1.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.2.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>kryonet</groupId>
+            <artifactId>kryonet</artifactId>
+            <version>2.21</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo</artifactId>
+            <version>5.0.0-RC5-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
+
+</project>
+

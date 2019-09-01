@@ -1,0 +1,909 @@
+package net.mcstats2.core.api.MCSEntity;
+
+import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.config.Configuration;
+import net.mcstats2.core.network.web.MCSData.MCSPlayerData;
+import net.mcstats2.core.network.web.RequestBuilder;
+import net.mcstats2.core.network.web.RequestResponse;
+
+import java.io.IOException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+
+public class MCSPlayer implements MCSEntity {
+    private MCSPlayerData data;
+
+    public MCSPlayer(MCSPlayerData data) {
+        this.data = data;
+    }
+
+    public UUID getUUID() {
+        return UUID.fromString(data.response.UUID);
+    }
+
+    public String getName() {
+        return data.response.name;
+    }
+
+    public MCSPlayerData.Response.Name[] getNames() {
+        return data.response.names;
+    }
+
+    public Skin getSkin() {
+        return new Skin(data.response.skin);
+    }
+
+    public Session getSession() {
+        return new Session(data.response.session);
+    }
+
+    public String getLanguage() {
+        return getSession().getAddressDetails().getLanguage();
+    }
+
+    public CData[] getCDatas() {
+        ArrayList<CData> all = new ArrayList<>();
+
+        for (MCSPlayerData.Response.CData datas : data.response.cdata)
+            all.add(new CData(datas));
+
+        return all.toArray(new CData[all.size()]);
+    }
+    public CData[] getCDatas(MCSPlayerData.CDataType type) {
+        ArrayList<CData> all = new ArrayList<>();
+
+        for (MCSPlayerData.Response.CData datas : data.response.cdata)
+            if (datas.type.equals(type))
+                all.add(new CData(datas));
+
+        return all.toArray(new CData[all.size()]);
+    }
+    public CData getCDataByID(String id) {
+        for (CData cData : getCDatas())
+            if (cData.getID().equals(id))
+                return cData;
+
+        return null;
+    }
+    public CData getCDataByID(MCSPlayerData.CDataType type, String id) {
+        for (CData cData : getCDatas(type))
+            if (cData.getID().equals(id))
+                return cData;
+
+        return null;
+    }
+    public CData getCDataByKey(String key) {
+        for (CData cData : getCDatas())
+            if (cData.getKey().equals(key))
+                return cData;
+
+        return null;
+    }
+    public CData getCDataByKey(MCSPlayerData.CDataType type, String key) {
+        for (CData cData : getCDatas(type))
+            if (cData.getKey().equals(key))
+                return cData;
+
+        return null;
+    }
+
+    public boolean isOnline() {
+        return MCSCore.getInstance().getServer().isOnline(this);
+    }
+
+    public void sendMessage(String message) {
+        MCSCore.getInstance().getServer().sendMessage(this, message);
+    }
+
+    public boolean hasPermission(String s) {
+        return MCSCore.getInstance().getServer().hasPermission(this, s);
+    }
+    public int getMax(String path) {
+        int limit = 255;
+
+        if (hasPermission("*"))
+            return -1;
+
+        if (hasPermission("MCStatsNET.*"))
+            return -1;
+
+        if (hasPermission(path + (path.endsWith(".") ? "" : ".") + "*"))
+            return -1;
+
+        for (int i=limit;i>0;i--)
+            if (hasPermission(path + (path.endsWith(".") ? "" : ".") + i))
+                return i;
+
+        return 0;
+    }
+
+    public Configuration getLanguageConfig() {
+        return MCSCore.getInstance().getLang(getLanguage());
+    }
+
+    public void disconnect(String reason) {
+        MCSCore.getInstance().getServer().disconnect(this, reason);
+    }
+    private void disconnect(Ban ban) {
+        HashMap<String, Object> replace = new HashMap<>();
+        replace.put("id", ban.getID());
+        replace.put("reason", ban.getCustomReason() == null ? (ban.getReason() != null ? ban.getReason().getText() : "err") : (ban.getCustomReason().isEmpty() ? "&8&o<none>&r" : ban.getCustomReason()));
+
+        if (ban.getExpire() != 0) {
+            long endsIn = Math.abs(ban.getExpire());
+            long seconds = (endsIn) % 60;
+            long minutes = (endsIn / 60) % 60;
+            long hours = (endsIn / 60 / 60) % 24;
+            long days = (endsIn / 60 / 60 / 24);
+            replace.put("seconds", seconds);
+            replace.put("minutes", minutes);
+            replace.put("hours", hours);
+            replace.put("days", days);
+
+            Timestamp end_timestamp = new Timestamp(ban.getTime() + (ban.getExpire()*1000));
+            replace.put("end_year", end_timestamp.getYear());
+            replace.put("end_month", end_timestamp.getMonth());
+            replace.put("end_date", end_timestamp.getDate());
+            replace.put("end_day", end_timestamp.getDay());
+            replace.put("end_hours", end_timestamp.getHours());
+            replace.put("end_minutes", end_timestamp.getMinutes());
+            replace.put("end_seconds", end_timestamp.getSeconds());
+        }
+
+        disconnect(MCSCore.getInstance().buildScreen(MCSCore.getInstance().getLang(getSession().getAddressDetails().getLanguage()), ban.getExpire() != 0 ? "ban.perm.screen" : "ban.temp.screen", replace)); 
+    }
+
+    public Warn createWarn(MCSEntity staff, String type, String expire) throws SQLException {
+        String id = MCSCore.randomString(10);
+
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__warns`(`id`, `UUID`, `STAFF`, `type`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), type, expire)) != 0)
+            return getWarn(id);
+
+        return null;
+    }
+
+    public Warn getWarn(String id) throws SQLException {
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=? && `id`=? LIMIT 1", Arrays.asList(getUUID().toString(), id));
+        if (rs.next())
+            return new Warn(rs);
+
+        return null;
+    }
+    public List<Warn> getWarns() throws SQLException {
+        List<Warn> warns = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=?", Arrays.asList(getUUID().toString()));
+        while (rs.next())
+            warns.add(new Warn(rs));
+
+        return warns;
+    }
+    public List<Warn> getWarnsByType(String type) throws SQLException {
+        List<Warn> warns = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__warns` WHERE `UUID`=? && `type`=?", Arrays.asList(getUUID().toString(), type));
+        while (rs.next())
+            warns.add(new Warn(rs));
+
+        return warns;
+    }
+
+
+    public Mute createMute(MCSEntity staff, MCSCore.MuteTemplate t) throws SQLException, InterruptedException, ExecutionException, IOException {
+        int count = getMutes(t).size();
+        if (t.getExpires().size() <= count)
+            count = t.getExpires().size() - 1;
+
+        String id = MCSCore.randomString(10);
+        int expire = t.getExpires().get(count);
+
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire)) != 0) {
+            Mute mute = getMute(id);
+
+            HashMap<String, Object> replace = new HashMap<>();
+            replace.put("id", mute.getID());
+            replace.put("reason", mute.getCustomReason() == null ? (mute.getReason() != null ? mute.getReason().getText() : "err") : (mute.getCustomReason().isEmpty() ? "&8&o<none>&r" : mute.getCustomReason()));
+
+            if (mute.getExpire() != 0) {
+                long endsIn = Math.abs(mute.getExpire());
+                long seconds = (endsIn) % 60;
+                long minutes = (endsIn / 60) % 60;
+                long hours = (endsIn / 60 / 60) % 24;
+                long days = (endsIn / 60 / 60 / 24);
+                replace.put("seconds", seconds);
+                replace.put("minutes", minutes);
+                replace.put("hours", hours);
+                replace.put("days", days);
+
+                Timestamp end_timestamp = new Timestamp(mute.getTime() + (mute.getExpire()*1000));
+                replace.put("end_year", end_timestamp.getYear());
+                replace.put("end_month", end_timestamp.getMonth());
+                replace.put("end_date", end_timestamp.getDate());
+                replace.put("end_day", end_timestamp.getDay());
+                replace.put("end_hours", end_timestamp.getHours());
+                replace.put("end_minutes", end_timestamp.getMinutes());
+                replace.put("end_seconds", end_timestamp.getSeconds());
+            }
+
+            if (isOnline())
+                sendMessage(MCSCore.getInstance().buildScreen(getLanguageConfig(), mute.getExpire() != 0 ? "mute.perm.screen" : "mute.temp.screen", replace));
+
+            replace.put("playername", getName());
+            replace.put("staffname", staff.getName());
+            MCSCore.getInstance().broadcast("MCStatsNET.mute.alert", "mute.prefix", mute.getExpire() != 0 ? "mute.temp.alert" : "mute.perm.alert", replace);
+
+            return mute;
+        }
+
+        return null;
+    }
+    public Mute createCustomMute(MCSEntity staff, String text, int expire) throws SQLException, InterruptedException, ExecutionException, IOException {
+        String id = MCSCore.randomString(10);
+
+        if (text == null)
+            text = "";
+
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes`(`id`, `UUID`, `STAFF`, `reason-text`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), text, expire)) != 0) {
+            Mute mute = getMute(id);
+
+            HashMap<String, Object> replace = new HashMap<>();
+            replace.put("id", mute.getID());
+            replace.put("reason", mute.getCustomReason() == null ? (mute.getReason() != null ? mute.getReason().getText() : "err") : (mute.getCustomReason().isEmpty() ? "&8&o<none>&r" : mute.getCustomReason()));
+
+            if (mute.getExpire() != 0) {
+                long endsIn = Math.abs(mute.getExpire());
+                long seconds = (endsIn) % 60;
+                long minutes = (endsIn / 60) % 60;
+                long hours = (endsIn / 60 / 60) % 24;
+                long days = (endsIn / 60 / 60 / 24);
+                replace.put("seconds", seconds);
+                replace.put("minutes", minutes);
+                replace.put("hours", hours);
+                replace.put("days", days);
+
+                Timestamp end_timestamp = new Timestamp(mute.getTime() + (mute.getExpire()*1000));
+                replace.put("end_year", end_timestamp.getYear());
+                replace.put("end_month", end_timestamp.getMonth());
+                replace.put("end_date", end_timestamp.getDate());
+                replace.put("end_day", end_timestamp.getDay());
+                replace.put("end_hours", end_timestamp.getHours());
+                replace.put("end_minutes", end_timestamp.getMinutes());
+                replace.put("end_seconds", end_timestamp.getSeconds());
+            }
+
+            if (isOnline())
+                sendMessage(MCSCore.getInstance().buildScreen(getLanguageConfig(), mute.getExpire() != 0 ? "mute.perm.screen" : "mute.temp.screen", replace));
+            
+            replace.put("playername", getName());
+            replace.put("staffname", staff.getName());
+            MCSCore.getInstance().broadcast("MCStatsNET.mute.alert", "mute.prefix", mute.getExpire() != 0 ? "mute.temp.alert" : "mute.perm.alert", replace);
+            
+            return mute;
+        }
+
+        return null;
+    }
+
+    public Mute getMute(String id) throws SQLException, InterruptedException, ExecutionException, IOException {
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `id`=? LIMIT 1", Arrays.asList(getUUID().toString(), id));
+        if (rs.next())
+            return new Mute(rs);
+
+        return null;
+    }
+    public Mute getActiveMute() throws SQLException, InterruptedException, ExecutionException, IOException {
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL) LIMIT 1", Arrays.asList(getUUID().toString()));
+        if (rs.next())
+            return new Mute(rs);
+
+        return null;
+    }
+    public List<Mute> getMutes() throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Mute> mutes = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=?", Arrays.asList(getUUID().toString()));
+        while (rs.next()) {
+            mutes.add(new Mute(rs));
+        }
+
+        return mutes;
+    }
+    public List<Mute> getMutes(MCSCore.MuteTemplate reason) throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Mute> mutes = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `reason`=?", Arrays.asList(getUUID().toString(), reason.getID()));
+        while (rs.next()) {
+            mutes.add(new Mute(rs));
+        }
+
+        return mutes;
+    }
+    public List<Mute> getMutesBySTAFF(MCSEntity staff) throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Mute> mutes = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? && `STAFF`=?", Arrays.asList(getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString()));
+        while (rs.next()) {
+            mutes.add(new Mute(rs));
+        }
+
+        return mutes;
+    }
+
+
+    public Ban createBan(MCSEntity staff, MCSCore.BanTemplate t) throws SQLException, InterruptedException, ExecutionException, IOException {
+        int count = getBans(t).size();
+        if (t.getExpires().size() <= count)
+                count = t.getExpires().size() - 1;
+
+        String id = MCSCore.randomString(10);
+        int expire = t.getExpires().get(count);
+
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__bans`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire)) != 0) {
+            Ban ban = getBan(id);
+
+            HashMap<String, Object> replace = new HashMap<>();
+            replace.put("id", ban.getID());
+            replace.put("reason", ban.getCustomReason() == null ? (ban.getReason() != null ? ban.getReason().getText() : "err") : (ban.getCustomReason().isEmpty() ? "&8&o<none>&r" : ban.getCustomReason()));
+
+            if (ban.getExpire() != 0) {
+                long endsIn = Math.abs(ban.getExpire());
+                long seconds = (endsIn) % 60;
+                long minutes = (endsIn / 60) % 60;
+                long hours = (endsIn / 60 / 60) % 24;
+                long days = (endsIn / 60 / 60 / 24);
+                replace.put("seconds", seconds);
+                replace.put("minutes", minutes);
+                replace.put("hours", hours);
+                replace.put("days", days);
+
+                Timestamp end_timestamp = new Timestamp(ban.getTime() + (ban.getExpire()*1000));
+                replace.put("end_year", end_timestamp.getYear());
+                replace.put("end_month", end_timestamp.getMonth());
+                replace.put("end_date", end_timestamp.getDate());
+                replace.put("end_day", end_timestamp.getDay());
+                replace.put("end_hours", end_timestamp.getHours());
+                replace.put("end_minutes", end_timestamp.getMinutes());
+                replace.put("end_seconds", end_timestamp.getSeconds());
+            }
+            replace.put("playername", getName());
+            replace.put("staffname", staff.getName());
+            MCSCore.getInstance().broadcast("MCStatsNET.ban.alert", "ban.prefix", ban.getExpire() != 0 ? "ban.temp.alert" : "ban.perm.alert", replace);
+
+            if (isOnline())
+                disconnect(ban);
+
+            return ban;
+        }
+
+        return null;
+    }
+    public Ban createCustomBan(MCSEntity staff, String text, int expire) throws SQLException, InterruptedException, ExecutionException, IOException {
+        String id = MCSCore.randomString(10);
+
+        if (text == null)
+            text = "";
+
+        if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__bans`(`id`, `UUID`, `STAFF`, `reason-text`, `expire`) VALUES (?,?,?,?,?)", Arrays.asList(id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(),text, expire)) != 0) {
+            Ban ban = getBan(id);
+
+            HashMap<String, Object> replace = new HashMap<>();
+            replace.put("id", ban.getID());
+            replace.put("reason", ban.getCustomReason() == null ? (ban.getReason() != null ? ban.getReason().getText() : "err") : (ban.getCustomReason().isEmpty() ? "&8&o<none>&r" : ban.getCustomReason()));
+
+            if (ban.getExpire() != 0) {
+                long endsIn = Math.abs(ban.getExpire());
+                long seconds = (endsIn) % 60;
+                long minutes = (endsIn / 60) % 60;
+                long hours = (endsIn / 60 / 60) % 24;
+                long days = (endsIn / 60 / 60 / 24);
+                replace.put("seconds", seconds);
+                replace.put("minutes", minutes);
+                replace.put("hours", hours);
+                replace.put("days", days);
+
+                Timestamp end_timestamp = new Timestamp(ban.getTime() + (ban.getExpire()*1000));
+                replace.put("end_year", end_timestamp.getYear());
+                replace.put("end_month", end_timestamp.getMonth());
+                replace.put("end_date", end_timestamp.getDate());
+                replace.put("end_day", end_timestamp.getDay());
+                replace.put("end_hours", end_timestamp.getHours());
+                replace.put("end_minutes", end_timestamp.getMinutes());
+                replace.put("end_seconds", end_timestamp.getSeconds());
+            }
+            replace.put("playername", getName());
+            replace.put("staffname", staff.getName());
+            MCSCore.getInstance().broadcast("MCStatsNET.ban.alert", "ban.prefix", ban.getExpire() != 0 ? "ban.temp.alert" : "ban.perm.alert", replace);
+
+            if (isOnline())
+                disconnect(ban);
+
+            return ban;
+        }
+
+        return null;
+    }
+
+    public Ban getBan(String id) throws SQLException, InterruptedException, ExecutionException, IOException {
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `id`=? LIMIT 1", Arrays.asList(getUUID().toString(), id));
+        if (rs.next())
+            return new Ban(rs);
+
+        return null;
+    }
+    public Ban getActiveBan() throws SQLException, InterruptedException, ExecutionException, IOException {
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL) LIMIT 1", Arrays.asList(getUUID().toString()));
+        if (rs.next())
+            return new Ban(rs);
+
+        return null;
+    }
+    public List<Ban> getBans() throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Ban> bans = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=?", Arrays.asList(getUUID().toString()));
+        while (rs.next()) {
+            bans.add(new Ban(rs));
+        }
+
+        return bans;
+    }
+    public List<Ban> getBans(MCSCore.BanTemplate reason) throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Ban> bans = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `reason`=?", Arrays.asList(getUUID().toString(), reason.getID()));
+        while (rs.next()) {
+            bans.add(new Ban(rs));
+        }
+
+        return bans;
+    }
+    public List<Ban> getBans(MCSEntity staff) throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Ban> bans = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? && `STAFF`=?", Arrays.asList(getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString()));
+        while (rs.next()) {
+            bans.add(new Ban(rs));
+        }
+
+        return bans;
+    }
+
+    public class Skin {
+        private MCSPlayerData.Response.Skin skin;
+
+
+        private Skin(MCSPlayerData.Response.Skin skin) {
+            this.skin = skin;
+        }
+
+        public String getID() {
+            return skin.id;
+        }
+
+        public String getValue() {
+            return skin.value;
+        }
+
+        public String getSignature() {
+            return skin.signature;
+        }
+    }
+
+    public class Session {
+        private MCSPlayerData.Response.Session session;
+
+        Session(MCSPlayerData.Response.Session session) {
+            this.session =  session;
+        }
+
+        public AddressDetails getAddressDetails() {
+            return new AddressDetails(session.addressDetails);
+        }
+
+        public Checks getChecks() {
+            return new Checks(session.checks);
+        }
+
+        public class AddressDetails {
+            private MCSPlayerData.Response.Session.AddressDetails addressDetails;
+
+            AddressDetails(MCSPlayerData.Response.Session.AddressDetails addressDetails) {
+                this.addressDetails = addressDetails;
+            }
+
+            public String getContinentCode() {
+                return addressDetails.continent_code;
+            }
+
+            public String getContinentName() {
+                return addressDetails.continent_name;
+            }
+
+            public String getCountryIsoCode() {
+                return addressDetails.country_iso_code;
+            }
+
+            public String getCountryCode() {
+                return addressDetails.country_name;
+            }
+
+            public String getLanguage() {
+                return addressDetails.language;
+            }
+
+            public String getTimezone() {
+                return addressDetails.timezone;
+            }
+
+            public boolean is_in_european_union() {
+                return addressDetails.is_in_european_union;
+            }
+        }
+
+        public class Checks {
+            private MCSPlayerData.Response.Session.Checks checks;
+
+            Checks(MCSPlayerData.Response.Session.Checks checks) {
+                this.checks = checks;
+            }
+
+            public Skin getSkin() {
+                if (checks.skin == null)
+                    return null;
+
+                return new Skin(checks.skin);
+            }
+
+            public Name getName() {
+                if (checks.name == null)
+                    return null;
+
+                return new Name(checks.name);
+            }
+
+            public VPN getVPN() {
+                if (checks.vpn == null)
+                    return null;
+
+                return new VPN(checks.vpn);
+            }
+
+            public GMute getGMute() {
+                if (checks.gmute == null)
+                    return null;
+
+                return new GMute(checks.gmute);
+            }
+
+            public GBan getGBan() {
+                if (checks.gban == null)
+                    return null;
+
+                return new GBan(checks.gban);
+            }
+
+            public class Skin {
+                MCSPlayerData.Response.Session.Checks.Skin skin;
+                
+                
+                Skin(MCSPlayerData.Response.Session.Checks.Skin skin) {
+                    this.skin = skin;
+                }
+
+                public String getID() {
+                    return skin.id;
+                }
+
+                public String getReason() {
+                    return skin.reason;
+                }
+
+                public boolean isBlocked() {
+                    return skin.block;
+                }
+            }
+
+            public class Name {
+                MCSPlayerData.Response.Session.Checks.Name name;
+
+
+                Name(MCSPlayerData.Response.Session.Checks.Name name) {
+                    this.name = name;
+                }
+
+                public String getID() {
+                    return name.id;
+                }
+
+                public String getReason() {
+                    return name.reason;
+                }
+
+                public boolean isBlocked() {
+                    return name.block;
+                }
+            }
+
+            public class VPN {
+                MCSPlayerData.Response.Session.Checks.VPN vpn;
+
+
+                VPN(MCSPlayerData.Response.Session.Checks.VPN vpn) {
+                    this.vpn = vpn;
+                }
+
+                public String getID() {
+                    return vpn.id;
+                }
+
+                public boolean isBlocked() {
+                    return vpn.block;
+                }
+            }
+
+            public class GMute {
+                MCSPlayerData.Response.Session.Checks.GMute gmute;
+
+
+                GMute(MCSPlayerData.Response.Session.Checks.GMute gmute) {
+                    this.gmute = gmute;
+                }
+
+                public String getScreen() {
+                    return gmute.screen;
+                }
+
+                public String getAlert() {
+                    return gmute.alert;
+                }
+                
+                public String getID() {
+                    return gmute.id;
+                }
+
+                public String getSTAFF() {
+                    return gmute.STAFF;
+                }
+
+                public MCSPlayerData.Response.Session.Checks.Reason getReason() {
+                    return gmute.reason;
+                }
+
+                public MCSPlayerData.Response.Session.Checks.Proof[] getProofs() {
+                    return gmute.proofs;
+                }
+
+                public int getExpire() {
+                    return gmute.expire;
+                }
+
+                public String getTimestamp() {
+                    return gmute.timestamp;
+                }
+            }
+
+            public class GBan {
+                MCSPlayerData.Response.Session.Checks.GBan gban;
+
+                GBan(MCSPlayerData.Response.Session.Checks.GBan gban) {
+                    this.gban = gban;
+                }
+
+                public String getScreen() {
+                    return gban.screen;
+                }
+
+                public String getAlert() {
+                    return gban.alert;
+                }
+
+                public String getID() {
+                    return gban.id;
+                }
+
+                public String getSTAFF() {
+                    return gban.STAFF;
+                }
+
+                public MCSPlayerData.Response.Session.Checks.Reason getReason() {
+                    return gban.reason;
+                }
+
+                public MCSPlayerData.Response.Session.Checks.Proof[] getProofs() {
+                    return gban.proofs;
+                }
+
+                public int getExpire() {
+                    return gban.expire;
+                }
+
+                public String getTimestamp() {
+                    return gban.timestamp;
+                }
+            }
+        }
+    }
+
+    public class CData {
+        private MCSPlayerData.Response.CData cdata;
+
+        CData(MCSPlayerData.Response.CData cdata) {
+            this.cdata = cdata;
+        }
+
+        public String getID() {
+            return cdata.id;
+        }
+
+        public MCSPlayerData.CDataType getType() {
+            return cdata.type;
+        }
+
+        public String getKey() {
+            return cdata.key;
+        }
+
+        public Object getValue() {
+            return cdata.value;
+        }
+
+        public int getExpires() {
+            return cdata.expires;
+        }
+
+        public boolean setValue(Object newValue) throws InterruptedException, ExecutionException, IOException {
+            RequestBuilder rb = MCSCore.getInstance().getAuthedRequest("/player/" + getUUID().toString() + "/cdata/" + getID() + "/update");
+
+            rb.putParam("value", newValue.toString());
+
+            boolean status = rb.post().getStatusCode() == 200;
+
+            if (status)
+                cdata.value = newValue;
+
+            return status;
+        }
+    }
+
+    public class Warn {
+
+        Warn(ResultSet rs) {
+        }
+    }
+
+    public class Mute {
+        private String id;
+        private String MCSid;
+        private MCSEntity STAFF;
+        private MCSCore.MuteTemplate reason;
+        private String customReason;
+        private int expire;
+        private boolean valid;
+        private long time;
+        private String timestamp;
+
+        Mute(ResultSet rs) throws SQLException, InterruptedException, ExecutionException, IOException {
+            id = rs.getString("id");
+            MCSid = rs.getString("MCSid");
+            STAFF = rs.getString("STAFF").equals("CONSOLE") ? new MCSConsole() : MCSCore.getInstance().getPlayer(UUID.fromString(rs.getString("STAFF")));
+            reason = rs.getString("reason") != null && !rs.getString("reason").isEmpty() ? MCSCore.getInstance().getMuteTemplateByID(rs.getString("reason")) : null;
+            customReason = rs.getString("reason-text");
+            expire = rs.getInt("expire");
+            valid = rs.getBoolean("valid");
+            time = rs.getTimestamp("timestamp").getTime();
+            timestamp = rs.getString("timestamp");
+        }
+
+        public String getID() {
+            return id;
+        }
+
+        public String getMCSid() {
+            return MCSid;
+        }
+
+        public MCSEntity getSTAFF() {
+            return STAFF;
+        }
+
+        public MCSCore.MuteTemplate getReason() {
+            if (reason == null)
+                return null;
+
+            return reason;
+        }
+
+        public String getCustomReason() {
+            return customReason;
+        }
+
+        public int getExpire() {
+            return expire;
+        }
+
+        public boolean isValid() {
+            return valid;
+        }
+
+        public long getTime() {
+            return time;
+        }
+
+        public String getTimestamp() {
+            return timestamp;
+        }
+
+        public boolean delete() {
+            return MCSCore.getInstance().getMySQL().queryUpdate("UPDATE MCSCore__mutes SET valid=0 WHERE id=? && UUID=?", Arrays.asList(getID(), getUUID().toString())) != 0;
+        }
+    }
+    public class Ban {
+        private String id;
+        private String MCSid;
+        private MCSEntity STAFF;
+        private MCSCore.BanTemplate reason;
+        private String customReason;
+        private int expire;
+        private boolean valid;
+        private long time;
+        private String timestamp;
+
+        Ban(ResultSet rs) throws SQLException, InterruptedException, ExecutionException, IOException {
+            id = rs.getString("id");
+            MCSid = rs.getString("MCSid");
+            STAFF = rs.getString("STAFF").equals("CONSOLE") ? new MCSConsole() : MCSCore.getInstance().getPlayer(UUID.fromString(rs.getString("STAFF")));
+            reason = rs.getString("reason") != null && !rs.getString("reason").isEmpty() ? MCSCore.getInstance().getBanTemplateByID(rs.getString("reason")) : null;
+            customReason = rs.getString("reason-text");
+            expire = rs.getInt("expire");
+            valid = rs.getBoolean("valid");
+            time = rs.getTimestamp("timestamp").getTime();
+            timestamp = rs.getString("timestamp");
+        }
+
+        public String getID() {
+            return id;
+        }
+
+        public String getMCSid() {
+            return MCSid;
+        }
+
+        public MCSEntity getSTAFF() {
+            return STAFF;
+        }
+
+        public MCSCore.BanTemplate getReason() {
+            if (reason == null)
+                return null;
+
+            return reason;
+        }
+
+        public String getCustomReason() {
+            return customReason;
+        }
+
+        public int getExpire() {
+            return expire;
+        }
+
+        public boolean isValid() {
+            return valid;
+        }
+
+        public long getTime() {
+            return time;
+        }
+
+        public String getTimestamp() {
+            return timestamp;
+        }
+
+        public boolean delete() {
+            return MCSCore.getInstance().getMySQL().queryUpdate("UPDATE MCSCore__bans SET valid=0 WHERE id=? && UUID=?", Arrays.asList(getID(), getUUID().toString())) != 0;
+        }
+    }
+}

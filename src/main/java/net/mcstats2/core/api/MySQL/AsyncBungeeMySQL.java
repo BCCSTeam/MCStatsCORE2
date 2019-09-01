@@ -1,0 +1,104 @@
+package net.mcstats2.core.api.MySQL;
+
+import net.md_5.bungee.api.plugin.Plugin;
+
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+
+public class AsyncBungeeMySQL implements AsyncMySQL {
+    private ExecutorService executor;
+    private Plugin plugin;
+    private MySQL sql;
+
+    public AsyncBungeeMySQL(Plugin owner, String host, int port, String user, String password, String database) {
+        try {
+            sql = new MySQL(host, port, user, password, database);
+            executor = Executors.newCachedThreadPool();
+            plugin = owner;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void update(PreparedStatement statement) {
+        executor.execute(() -> sql.queryUpdate(statement));
+    }
+
+    @Override
+    public void update(String statement) {
+        executor.execute(() -> sql.queryUpdate(statement));
+    }
+
+    @Override
+    public void update(String statement, List<Object> args) {
+        executor.execute(() -> sql.queryUpdate(statement, args));
+    }
+
+    @Override
+    public void update(PreparedStatement statement, Consumer<Integer> consumer) {
+        executor.execute(() -> {
+            int result = sql.queryUpdate(statement);
+            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+        });
+    }
+
+    @Override
+    public void update(String statement, Consumer<Integer> consumer) {
+        executor.execute(() -> {
+            int result = sql.queryUpdate(statement);
+            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+        });
+    }
+
+    @Override
+    public void update(String statement, List<Object> args, Consumer<Integer> consumer) {
+        executor.execute(() -> {
+            int result = sql.queryUpdate(statement, args);
+            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+        });
+    }
+
+    @Override
+    public void query(PreparedStatement statement, Consumer<ResultSet> consumer) {
+        executor.execute(() -> {
+            ResultSet result = sql.query(statement);
+            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+        });
+    }
+
+    @Override
+    public void query(String statement, Consumer<ResultSet> consumer) {
+        executor.execute(() -> {
+            ResultSet result = sql.query(statement);
+            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+        });
+    }
+
+    @Override
+    public void query(String statement, List<Object> args, Consumer<ResultSet> consumer) {
+        executor.execute(() -> {
+            ResultSet result = sql.query(statement, args);
+            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+        });
+    }
+
+    @Override
+    public PreparedStatement prepare(String query) {
+        try {
+            return sql.getConnection().prepareStatement(query);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public MySQL getMySQL() {
+        return sql;
+    }
+}

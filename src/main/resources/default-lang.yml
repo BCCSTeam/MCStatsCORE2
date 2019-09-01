@@ -1,0 +1,135 @@
+noPermissions: '&cYou are not allowed to use this command!'
+permanent: 'Never'
+
+ChatFilter:
+  prefix: '&e&lCHAT&r &7&l|&r &7'
+  utf-8: ''
+  spam: '&cPlease to not spam!'
+  address: '&cPlease do not post external Addresses!'
+
+checks:
+  prefix: '&e&lCHECKS&r &7&l|&r &7'
+  AntiVPN:
+    screen:
+      - ''
+      - '&4! ! !'
+      - ''
+      - '&cPlease turn your VPN/Proxy off!'
+      - ''
+      - '&4! ! !'
+      - '&8%id%'
+      - ''
+    alert: '&7[%id%] &c%playername% &7tried to connect with a VPN/Proxy!'
+    alertButIgnore: '&7[%id%] &c%playername% &7is using a VPN/Proxy on this Network, but he is allowed to bypass the Check.'
+  SkinChecker:
+    screen:
+      - ''
+      - '&4! ! !'
+      - ''
+      - '&cPlease turn your VPN/Proxy off!'
+      - ''
+      - '&4! ! !'
+      - '&8%id%'
+      - ''
+    alert: '&7[%id%] &c%playername% &7tried to connect with a VPN/Proxy!'
+    alertButIgnore: '&7[%id%] &c%playername% &7is using a VPN/Proxy on this Network, but he is allowed to bypass the Check.'
+  AccountLimiter:
+    screen:
+      - ''
+      - '&4! ! !'
+      - ''
+      - '&cAccount Limit reached! &7(%amount%/%max%)'
+      - ''
+      - '&4! ! !'
+      - ''
+    alert: '&c%playername% &7AccountLimit reached! &8(%amount%/%max%)'
+
+
+kick:
+  prefix: '&a&lKICK&r &7&l|&r &7'
+  notAllowed: '&7You are not allowed to kick &c%playername% &7from the server!'
+  offline: '&cThe Player is offline or does not exist...'
+  self: '&cDo not kick yourself!'
+  screen:
+    - ''
+    - '&4You got Kicked from this Network!'
+    - ''
+    - '&7Reason: &c%reason%'
+    - ''
+  alert: '&c%playername% &7got kicked by &a%staffname%&7, for &c%reason%&7.'
+
+
+unmute:
+  prefix: '&a&lUNMUTE&r &7&l|&r &7'
+  notMuted: '&c%playername% has no active Mute!'
+  alert: '&c%playername% &7was unmuted by &a%staffname%&7.'
+
+mute:
+  prefix: '&6&lMUTE&r &7&l|&r &7'
+  unknowntemplate: '&cMute Template not found!'
+  notAllowed: '&7You are not allowed to mute &c%playername% &7from the chat!'
+  alreadyBlocked: '&c%playername% is allready blocked!'
+  bypass: '&c%playername% &7ignores Mutes from the server!'
+  self: '&cPlease do not Mute yourself!'
+  temp:
+    screen:
+      - ''
+      - '&4You are Muted from the Chat!'
+      - ''
+      - '&7Reason: &c%reason%'
+      - '&7Expire: &6%days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds'
+      - '&7muteID: &6%id%'
+      - ''
+      - '&eUnmute appeals at http://example.com'
+      - ''
+    alert: '&7[%id%] &c%playername% &7was muted by &a%staffname%&7, for &c%reason%&7. Expire: %days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds.'
+  perm:
+    screen:
+      - ''
+      - '&4You are Muted from the Chat!'
+      - ''
+      - '&7Reason: &c%reason%'
+      - '&7Expire: &4Never'
+      - '&7muteID: &6%id%'
+      - ''
+      - '&eUnmute appeals at http://example.com'
+      - ''
+    alert: '&7[%id%] &c%playername% &7was muted by &a%staffname%&7, for &c%reason%&7. Expire: Never'
+
+
+unban:
+  prefix: '&a&lUNBAN&r &7&l|&r &7'
+  notBanned: '&c%playername% has no active Ban!'
+  alert: '&c%playername% &7was unbanned by &a%staffname%&7.'
+
+ban:
+  prefix: '&c&lBAN&r &7&l|&r &7'
+  unknowntemplate: '&cBan Template not found!'
+  notAllowed: '&7You are not allowed to ban &c%playername% &7from the server!'
+  alreadyBlocked: '&c%playername% is allready blocked!'
+  bypass: '&c%playername% &7ignores Bans from the server!'
+  self: '&cPlease do not Ban yourself!'
+  temp:
+    screen:
+      - ''
+      - '&4You are Banned from this Network!'
+      - ''
+      - '&7Reason: &c%reason%'
+      - '&7Expire: &6%days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds'
+      - '&7banID: &6%id%'
+      - ''
+      - '&eUnban appeals at http://example.com'
+      - ''
+    alert: '&7[%id%] &c%playername% &7was banned by &a%staffname%&7, for &c%reason%&7. Expire: %days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds.'
+  perm:
+    screen:
+      - ''
+      - '&4You are Banned from this Network!'
+      - ''
+      - '&7Reason: &c%reason%'
+      - '&7Expire: &4Never'
+      - '&7banID: &6%id%'
+      - ''
+      - '&eUnban appeals at http://example.com'
+      - ''
+    alert: '&7[%id%] &c%playername% &7was banned by &a%staffname%&7, for &c%reason%&7. Expire: Never'
