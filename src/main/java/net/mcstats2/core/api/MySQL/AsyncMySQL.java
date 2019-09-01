@@ -11,19 +11,19 @@ public interface AsyncMySQL {
 
     void update(String statement);
 
-    void update(String statement, List<Object> args);
+    void update(String statement, Object... args);
 
     void update(PreparedStatement statement, Consumer<Integer> consumer);
 
     void update(String statement, Consumer<Integer> consumer);
 
-    void update(String statement, List<Object> args, Consumer<Integer> consumer);
+    void update(String statement, Consumer<Integer> consumer, Object... args);
 
-    void query(PreparedStatement statement, Consumer< ResultSet > consumer);
+    void query(PreparedStatement statement, Consumer<ResultSet> consumer);
 
     void query(String statement, Consumer<ResultSet> consumer);
 
-    void query(String statement, List<Object> args, Consumer<ResultSet> consumer);
+    void query(String statement, Consumer<ResultSet> consumer, Object... args);
 
     PreparedStatement prepare(String query);
 

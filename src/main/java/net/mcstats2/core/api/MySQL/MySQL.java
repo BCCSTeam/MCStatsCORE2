@@ -32,12 +32,12 @@ public class MySQL {
         return 0;
     }
 
-    public int queryUpdate(String query, List<Object> args) {
+    public int queryUpdate(String query, Object... args) {
         checkConnection();
         try (PreparedStatement statement = conn.prepareStatement(query)) {
 
-            for(int i=0;i<args.size();i++)
-                statement.setObject(1+i, args.get(i));
+            for(int i=0;i<args.length;i++)
+                statement.setObject(1+i, args[i]);
 
             return queryUpdate(statement);
         } catch (Exception e) {
@@ -74,13 +74,13 @@ public class MySQL {
         return null;
     }
 
-    public ResultSet query(String query, List<Object> args) {
+    public ResultSet query(String query, Object... args) {
         checkConnection();
         try {
             PreparedStatement ps = conn.prepareStatement(query);
 
-            for(int i=0;i<args.size();i++)
-                ps.setObject(1+i, args.get(i));
+            for(int i=0;i<args.length;i++)
+                ps.setObject(1+i, args[i]);
 
             return query(ps);
         } catch (Exception e) {

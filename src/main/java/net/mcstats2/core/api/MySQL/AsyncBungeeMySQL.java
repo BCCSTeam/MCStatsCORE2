@@ -35,7 +35,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     }
 
     @Override
-    public void update(String statement, List<Object> args) {
+    public void update(String statement, Object... args) {
         executor.execute(() -> sql.queryUpdate(statement, args));
     }
 
@@ -56,7 +56,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     }
 
     @Override
-    public void update(String statement, List<Object> args, Consumer<Integer> consumer) {
+    public void update(String statement, Consumer<Integer> consumer, Object... args) {
         executor.execute(() -> {
             int result = sql.queryUpdate(statement, args);
             plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
@@ -80,7 +80,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     }
 
     @Override
-    public void query(String statement, List<Object> args, Consumer<ResultSet> consumer) {
+    public void query(String statement, Consumer<ResultSet> consumer, Object... args) {
         executor.execute(() -> {
             ResultSet result = sql.query(statement, args);
             plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
