@@ -111,6 +111,12 @@
             <url>http://repo.gravitydevelopment.net</url>
         </repository>-->
 
+
+        <repository>
+            <id>spigot-repo</id>
+            <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
+        </repository>
+
         <repository>
             <id>mcstats-maven</id>
             <url>https://maven.mcstats.net</url>
@@ -139,10 +145,11 @@
     </repositories>
 
     <dependencies>
+
         <dependency>
-            <groupId>org.spigotmc</groupId>
-            <artifactId>spigot</artifactId>
-            <version>1.8</version>
+            <groupId>org.bukkit</groupId>
+            <artifactId>bukkit</artifactId>
+            <version>1.8-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 

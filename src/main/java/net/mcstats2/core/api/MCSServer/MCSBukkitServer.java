@@ -1,21 +1,44 @@
 package net.mcstats2.core.api.MCSServer;
 
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.MCSEntity.MCSConsole;
+import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-public class MCSBukkitServer implements MCSServer {
+public class MCSBukkitServer implements MCSServer, Listener {
     private Plugin plugin;
 
     public MCSBukkitServer(Plugin plugin) {
         this.plugin = plugin;
+
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    }
+
+    @EventHandler
+    public void on(PlayerLoginEvent e) throws Exception {
+        Player p = e.getPlayer();
+        MCSCore.getInstance().playerJoin(p.getUniqueId(),
+                p.getName(),
+                e.getAddress().getHostAddress(),
+                e.getHostname(),
+                -1);
+    }
+
+    @EventHandler
+    public void on(PlayerQuitEvent e) {
+
     }
 
     @Override
@@ -78,9 +101,7 @@ public class MCSBukkitServer implements MCSServer {
         for(Player p : plugin.getServer().getOnlinePlayers())
             data.add(MCSCore.getInstance().getPlayer(p.getUniqueId()));
 
-        MCSPlayer[] players = new MCSPlayer[data.size()];
-        data.toArray(players);
-        return players;
+        return data.toArray(new MCSPlayer[0]);
     }
 
     @Override
@@ -113,5 +134,15 @@ public class MCSBukkitServer implements MCSServer {
     @Override
     public void sendConsole(String message) {
         plugin.getServer().getConsoleSender().sendMessage(message);
+    }
+
+    public boolean dispatchCommand(CommandSender cs, String cmd, String[] args) throws InterruptedException, ExecutionException, IOException {
+        MCSEntity s;
+        if (cs instanceof Player)
+            s = MCSCore.getInstance().getPlayer(((Player)cs).getUniqueId());
+        else
+            s = new MCSConsole();
+
+        return MCSCore.getInstance().dispatchCommand(s, cmd, args);
     }
 }

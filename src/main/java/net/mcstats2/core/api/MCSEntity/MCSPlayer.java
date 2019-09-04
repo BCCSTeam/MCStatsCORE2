@@ -93,6 +93,11 @@ public class MCSPlayer implements MCSEntity {
         return MCSCore.getInstance().getServer().isOnline(this);
     }
 
+    @Override
+    public void sendMessage() {
+        sendMessage("");
+    }
+
     public void sendMessage(String message) {
         MCSCore.getInstance().getServer().sendMessage(this, message);
     }

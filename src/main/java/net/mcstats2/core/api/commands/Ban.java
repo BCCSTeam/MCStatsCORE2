@@ -1,15 +1,11 @@
-package net.mcstats2.bridge.server.bungee.commands;
+package net.mcstats2.core.api.commands;
 
 import net.mcstats2.core.MCSCore;
-import net.mcstats2.core.api.MCSEntity.MCSConsole;
+import net.mcstats2.core.api.ChatColor;
+import net.mcstats2.core.api.Command;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
 import net.mcstats2.core.api.config.Configuration;
-import net.md_5.bungee.api.ChatColor;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.plugin.Command;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -22,32 +18,17 @@ public class Ban extends Command {
     }
 
     @Override
-    public void execute(CommandSender cs, String[] args) {
-        MCSEntity p = null;
-        if (cs instanceof ProxiedPlayer) {
-            try {
-                p = MCSCore.getInstance().getPlayer(((ProxiedPlayer) cs).getUniqueId());
-            } catch (IOException | InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        } else
-            p = new MCSConsole();
-
-        if (p == null) {
-            cs.sendMessage(TextComponent.fromLegacyText("§cError with your Profile!"));
-            return;
-        }
-
+    public void execute(MCSEntity p, String[] args) {
         Configuration lang = MCSCore.getInstance().getLang((p instanceof MCSPlayer) ? ((MCSPlayer) p).getSession().getAddressDetails().getLanguage() : "default");
 
-        int m = cs instanceof ProxiedPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.ban.power") : -1;
-        int templatePower = cs instanceof ProxiedPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.ban.template.power") : -1;
+        int m = p instanceof MCSPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.ban.power") : -1;
+        int templatePower = p instanceof MCSPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.ban.template.power") : -1;
 
         if (templatePower == -1)
             templatePower = 255;
 
         if (m == 0 || templatePower == 0) {
-            cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + lang.getString("noPermissions"))));
+            p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + lang.getString("noPermissions"))));
             return;
         }
 
@@ -59,7 +40,7 @@ public class Ban extends Command {
                 e.printStackTrace();
             }
             if (tp == null) {
-                cs.sendMessage(TextComponent.fromLegacyText("§cError with the other Profile!"));
+                p.sendMessage(("§cError with the other Profile!"));
                 return;
             }
 
@@ -67,13 +48,13 @@ public class Ban extends Command {
 
             if (m != -1)
                 if (m <= tm || tp.hasPermission("MCStatsNET.ban.bypass")) {
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + lang.getString("ban.notAllowed").replace("%playername%", tp.getName()))));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + lang.getString("ban.notAllowed").replace("%playername%", tp.getName()))));
                     return;
                 }
 
             try {
                 if (tp.getActiveBan() != null) {
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + lang.getString("ban.alreadyBlocked").replace("%playername%", tp.getName()))));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + lang.getString("ban.alreadyBlocked").replace("%playername%", tp.getName()))));
                     return;
                 }
             } catch (SQLException | InterruptedException | ExecutionException | IOException e) {
@@ -89,7 +70,7 @@ public class Ban extends Command {
 
             if (bt == null) {
                 try {
-                    cs.sendMessage();
+                    p.sendMessage();
                     for (MCSCore.BanTemplate bt1 : MCSCore.getInstance().getBanTemplates(args[1], templatePower)) {
                         String name = "§6" + bt1.getName().replace(args[1],"§e" + args[1] + "§r§6");
 
@@ -119,9 +100,9 @@ public class Ban extends Command {
                                 expires += seconds + "s";
                         }
 
-                        cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + name + " §8- §e" + bt1.getText() + " §8[§7" + expires + "§8]")));
+                        p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + name + " §8- §e" + bt1.getText() + " §8[§7" + expires + "§8]")));
                     }
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.unknowntemplate"))));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("ban.unknowntemplate"))));
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -135,7 +116,7 @@ public class Ban extends Command {
             }
         } else {
             try {
-                cs.sendMessage();
+                p.sendMessage();
                 for (MCSCore.BanTemplate bt1 : MCSCore.getInstance().getBanTemplates(templatePower)) {
 
                     String expires = "";
@@ -164,12 +145,12 @@ public class Ban extends Command {
                             expires += seconds + "s";
                     }
 
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + bt1.getName() + " §8- §e" + bt1.getText() + " §8[§7" + expires + "§8]")));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("ban.prefix") + bt1.getName() + " §8- §e" + bt1.getText() + " §8[§7" + expires + "§8]")));
                 }
             } catch (SQLException e) {
                 e.printStackTrace();
             }
-            cs.sendMessage(TextComponent.fromLegacyText("§a/ban <player> <reason>"));
+            p.sendMessage(("§a/ban <player> <reason>"));
         }
     }
 }

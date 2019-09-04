@@ -1,15 +1,12 @@
-package net.mcstats2.bridge.server.bungee.commands;
+package net.mcstats2.core.api.commands;
 
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.ChatColor;
+import net.mcstats2.core.api.Command;
 import net.mcstats2.core.api.MCSEntity.MCSConsole;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
 import net.mcstats2.core.api.config.Configuration;
-import net.md_5.bungee.api.ChatColor;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.plugin.Command;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -23,29 +20,14 @@ public class MuteRemove extends Command {
     }
 
     @Override
-    public void execute(CommandSender cs, String[] args) {
-        MCSEntity p = null;
-        if (cs instanceof ProxiedPlayer) {
-            try {
-                p = MCSCore.getInstance().getPlayer(((ProxiedPlayer) cs).getUniqueId());
-            } catch (IOException | InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        } else
-            p = new MCSConsole();
-
-        if (p == null) {
-            cs.sendMessage(TextComponent.fromLegacyText("§cError with your Profile!"));
-            return;
-        }
-
+    public void execute(MCSEntity p, String[] args) {
         Configuration lang = MCSCore.getInstance().getLang((p instanceof MCSPlayer) ? ((MCSPlayer) p).getSession().getAddressDetails().getLanguage() : "default");
 
-        int m = cs instanceof ProxiedPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.unmute.power") : -1;
-        int templatePower = cs instanceof ProxiedPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.unmute.template.power") : -1;
+        int m = p instanceof MCSPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.unmute.power") : -1;
+        int templatePower = p instanceof MCSPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.unmute.template.power") : -1;
 
         if (m == 0 || templatePower == 0) {
-            cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("noPermissions"))));
+            p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("noPermissions"))));
             return;
         }
 
@@ -57,7 +39,7 @@ public class MuteRemove extends Command {
                 e.printStackTrace();
             }
             if (tp == null) {
-                cs.sendMessage(TextComponent.fromLegacyText("§cError with the other Profile!"));
+                p.sendMessage(("§cError with the other Profile!"));
                 return;
             }
 
@@ -69,14 +51,14 @@ public class MuteRemove extends Command {
             }
 
             if (mute == null || !mute.isValid()) {
-                cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("unmute.notMuted").replace("%playername%", tp.getName()))));
+                p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("unmute.notMuted").replace("%playername%", tp.getName()))));
                 return;
             }
 
             if (mute.getSTAFF() instanceof MCSPlayer && m != -1) {
                 MCSPlayer s = (MCSPlayer)mute.getSTAFF();
                 if (m < s.getMax("MCStatsNET.mute.power")) {
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("noPermissions"))));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("noPermissions"))));
                     return;
                 }
             }
@@ -85,7 +67,7 @@ public class MuteRemove extends Command {
                 MCSCore.MuteTemplate bt = mute.getReason();
 
                 if (templatePower < bt.getPower()) {
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("noPermissions"))));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("unmute.prefix") + lang.getString("noPermissions"))));
                     return;
                 }
             }
@@ -100,8 +82,8 @@ public class MuteRemove extends Command {
                     e.printStackTrace();
                 }
             } else
-                cs.sendMessage(TextComponent.fromLegacyText("§cFailed!"));
+                p.sendMessage(("§cFailed!"));
         } else
-            cs.sendMessage(TextComponent.fromLegacyText("§a/unmute <player>"));
+            p.sendMessage(("§a/unmute <player>"));
     }
 }

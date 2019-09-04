@@ -6,7 +6,7 @@ authors: []
 website: https://www.mcstats.net
 
 main: net.mcstats2.bridge.server.bukkit.Core
-commands:
+xyz:
   mcstats:
     usage: </command>
   info:

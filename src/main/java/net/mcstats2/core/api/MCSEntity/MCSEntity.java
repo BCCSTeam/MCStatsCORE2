@@ -9,4 +9,8 @@ public interface MCSEntity {
     String getName();
 
     boolean hasPermission(String perm);
+
+    void sendMessage();
+
+    void sendMessage(String s);
 }

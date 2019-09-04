@@ -1,15 +1,11 @@
-package net.mcstats2.bridge.server.bungee.commands;
+package net.mcstats2.core.api.commands;
 
 import net.mcstats2.core.MCSCore;
-import net.mcstats2.core.api.MCSEntity.MCSConsole;
+import net.mcstats2.core.api.ChatColor;
+import net.mcstats2.core.api.Command;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
 import net.mcstats2.core.api.config.Configuration;
-import net.md_5.bungee.api.ChatColor;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.plugin.Command;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -22,28 +18,13 @@ public class MuteCustom extends Command {
     }
 
     @Override
-    public void execute(CommandSender cs, String[] args) {
-        MCSEntity p = null;
-        if (cs instanceof ProxiedPlayer) {
-            try {
-                p = MCSCore.getInstance().getPlayer(((ProxiedPlayer) cs).getUniqueId());
-            } catch (IOException | InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        } else
-            p = new MCSConsole();
-
-        if (p == null) {
-            cs.sendMessage(TextComponent.fromLegacyText("§cError with your Profile!"));
-            return;
-        }
-
+    public void execute(MCSEntity p, String[] args) {
         Configuration lang = MCSCore.getInstance().getLang((p instanceof MCSPlayer) ? ((MCSPlayer) p).getSession().getAddressDetails().getLanguage() : "default");
 
-        int m = cs instanceof ProxiedPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.mute.power") : -1;
+        int m = p instanceof MCSPlayer ? ((MCSPlayer) p).getMax("MCStatsNET.mute.power") : -1;
 
-        if (m == 0 || !cs.hasPermission("MCStatsNET.mute.custom")) {
-            cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("mute.prefix") + lang.getString("noPermissions"))));
+        if (m == 0 || !p.hasPermission("MCStatsNET.mute.custom")) {
+            p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("mute.prefix") + lang.getString("noPermissions"))));
             return;
         }
 
@@ -55,7 +36,7 @@ public class MuteCustom extends Command {
                 e.printStackTrace();
             }
             if (tp == null) {
-                cs.sendMessage(TextComponent.fromLegacyText("§cError with the other Profile!"));
+                p.sendMessage(("§cError with the other Profile!"));
                 return;
             }
 
@@ -63,13 +44,13 @@ public class MuteCustom extends Command {
 
             if (m != -1)
                 if (m <= tm || tp.hasPermission("MCStatsNET.mute.bypass")) {
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("mute.prefix") + lang.getString("mute.notAllowed").replace("%playername%", tp.getName()))));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("mute.prefix") + lang.getString("mute.notAllowed").replace("%playername%", tp.getName()))));
                     return;
                 }
 
             try {
                 if (tp.getActiveMute() != null) {
-                    cs.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', lang.getString("mute.prefix") + lang.getString("mute.alreadyBlocked").replace("%playername%", tp.getName()))));
+                    p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("mute.prefix") + lang.getString("mute.alreadyBlocked").replace("%playername%", tp.getName()))));
                     return;
                 }
             } catch (SQLException | InterruptedException | ExecutionException | IOException e) {
@@ -86,7 +67,7 @@ public class MuteCustom extends Command {
             int expire = MCSCore.getExpire(args[1]);
 
             if (expire == -1) {
-                cs.sendMessage(TextComponent.fromLegacyText("§a/cmute <player> <time|§e§nyMwdhms§r§a> <reason>"));
+                p.sendMessage(("§a/cmute <player> <time|§e§nyMwdhms§r§a> <reason>"));
                 return;
             }
 
@@ -96,7 +77,7 @@ public class MuteCustom extends Command {
                 e.printStackTrace();
             }
         } else {
-            cs.sendMessage(TextComponent.fromLegacyText("§a/cmute <player> <time|yMwdhms> <reason>"));
+            p.sendMessage(("§a/cmute <player> <time|yMwdhms> <reason>"));
         }
     }
 }

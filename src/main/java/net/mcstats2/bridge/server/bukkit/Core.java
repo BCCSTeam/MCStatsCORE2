@@ -13,13 +13,18 @@ import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
 import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
 import net.mcstats2.core.network.web.MCSData.MCSFilterData;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
+import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 public class Core extends JavaPlugin {
@@ -84,7 +89,7 @@ public class Core extends JavaPlugin {
         if(!filterdir.exists())
             filterdir.mkdir();
 
-        for (File file : filterdir.listFiles()) {
+        for (File file : Objects.requireNonNull(filterdir.listFiles())) {
             if (!file.getName().endsWith(".json"))
                 continue;
 
@@ -103,28 +108,37 @@ public class Core extends JavaPlugin {
                 }
             }
         }
+        
+        //getServer().getPluginManager().registerListener(this, new PlayerJoin(this));
+        //getServer().getPluginManager().registerListener(this, new PlayerQuit(this));
 
-        /*
-        getProxy().getPluginManager().registerListener(this, new PlayerJoin(this));
-        getProxy().getPluginManager().registerListener(this, new PlayerQuit(this));
+        /*if (config.getBoolean("Modules.ChatFilter.enabled"))
+            getServer().getPluginManager().registerListener(this, new ChatFilter(this));*/
 
-        if (config.getBoolean("Modules.ChatFilter.enabled"))
-            getProxy().getPluginManager().registerListener(this, new ChatFilter(this));
 
-        if (config.getBoolean("Modules.Kick.enabled"))
-            getProxy().getPluginManager().registerCommand(this, new Kick("kick"));
+        try {
+            final Field bukkitCommandMap = Bukkit.getServer().getClass().getDeclaredField("commandMap");
 
-        if (config.getBoolean("Modules.Mute.enabled")) {
-            getProxy().getPluginManager().registerCommand(this, new MuteCustom("cmute"));
-            getProxy().getPluginManager().registerCommand(this, new Mute("mute"));
-            getProxy().getPluginManager().registerCommand(this, new MuteRemove("unmute"));
+            bukkitCommandMap.setAccessible(true);
+            CommandMap commandMap = (CommandMap) bukkitCommandMap.get(Bukkit.getServer());
+
+            if (config.getBoolean("Modules.Kick.enabled"))
+                commandMap.register("kick", new CommandManager("kick", null, null, new ArrayList<String>()));
+
+            if (config.getBoolean("Modules.Mute.enabled")) {
+                commandMap.register("cmute", new CommandManager("cmute", null, null, new ArrayList<String>()));
+                commandMap.register("mute", new CommandManager("mute", null, null, new ArrayList<String>()));
+                commandMap.register("unmute", new CommandManager("unmute", null, null, new ArrayList<String>()));
+            }
+
+            if (config.getBoolean("Modules.Ban.enabled")) {
+                commandMap.register("cban", new CommandManager("cban", null, null, new ArrayList<String>()));
+                commandMap.register("ban", new CommandManager("ban", null, null, new ArrayList<String>()));
+                commandMap.register("unban", new CommandManager("unban", null, null, new ArrayList<String>()));
+            }
+        } catch(Exception e) {
+            e.printStackTrace();
         }
-
-        if (config.getBoolean("Modules.Ban.enabled")) {
-            getProxy().getPluginManager().registerCommand(this, new BanCustom("cban"));
-            getProxy().getPluginManager().registerCommand(this, new Ban("ban"));
-            getProxy().getPluginManager().registerCommand(this, new BanRemove("unban"));
-        }*/
     }
 
     @Override

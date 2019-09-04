@@ -3,13 +3,13 @@ package net.mcstats2.bridge.server.bungee;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import net.mcstats2.bridge.server.bungee.commands.*;
 import net.mcstats2.bridge.server.bungee.listeners.ChatFilter;
 import net.mcstats2.bridge.server.bungee.listeners.PlayerJoin;
 import net.mcstats2.bridge.server.bungee.listeners.PlayerQuit;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSServer.MCSBungeeServer;
 import net.mcstats2.core.api.MySQL.AsyncBungeeMySQL;
+import net.mcstats2.core.api.commands.*;
 import net.mcstats2.core.network.web.MCSData.MCSFilterData;
 import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
@@ -110,24 +110,24 @@ public class Core extends Plugin {
         getProxy().getPluginManager().registerListener(this, new PlayerJoin(this));
         getProxy().getPluginManager().registerListener(this, new PlayerQuit(this));
 
-        getProxy().getPluginManager().registerCommand(this, new Jump("jump"));
+        getProxy().getPluginManager().registerCommand(this, new CommandManager("jump"));
 
         if (config.getBoolean("Modules.ChatFilter.enabled"))
             getProxy().getPluginManager().registerListener(this, new ChatFilter(this));
 
         if (config.getBoolean("Modules.Kick.enabled"))
-            getProxy().getPluginManager().registerCommand(this, new Kick("kick"));
+            getProxy().getPluginManager().registerCommand(this, new CommandManager("kick"));
 
         if (config.getBoolean("Modules.Mute.enabled")) {
-            getProxy().getPluginManager().registerCommand(this, new MuteCustom("cmute"));
-            getProxy().getPluginManager().registerCommand(this, new Mute("mute"));
-            getProxy().getPluginManager().registerCommand(this, new MuteRemove("unmute"));
+            getProxy().getPluginManager().registerCommand(this, new CommandManager("cmute"));
+            getProxy().getPluginManager().registerCommand(this, new CommandManager("mute"));
+            getProxy().getPluginManager().registerCommand(this, new CommandManager("unmute"));
         }
 
         if (config.getBoolean("Modules.Ban.enabled")) {
-            getProxy().getPluginManager().registerCommand(this, new BanCustom("cban"));
-            getProxy().getPluginManager().registerCommand(this, new Ban("ban"));
-            getProxy().getPluginManager().registerCommand(this, new BanRemove("unban"));
+            getProxy().getPluginManager().registerCommand(this, new CommandManager("cban"));
+            getProxy().getPluginManager().registerCommand(this, new CommandManager("ban"));
+            getProxy().getPluginManager().registerCommand(this, new CommandManager("unban"));
         }
     }
 

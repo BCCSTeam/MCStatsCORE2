@@ -6,10 +6,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.mcstats2.core.api.ChatColor;
+import net.mcstats2.core.api.Command;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSSystem;
+import net.mcstats2.core.api.MCSServer.MCSBungeeServer;
 import net.mcstats2.core.api.MCSServer.MCSServer;
 import net.mcstats2.core.api.MySQL.MySQL;
+import net.mcstats2.core.api.commands.*;
 import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
 import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
@@ -52,6 +55,9 @@ public class MCSCore {
     private ArrayList<String> running = new ArrayList<>();
     private HashMap<Integer, Long> cooldowns = new HashMap<>();
 
+    private static final Pattern argsSplit = Pattern.compile(" ");
+    private final Map<String, Command> commandMap = new HashMap<>();
+
     private File pluginDir;
     private Configuration lang = null;
     private HashMap<String, Configuration> langs = new HashMap<>();
@@ -75,14 +81,21 @@ public class MCSCore {
                 if (!d.exists()) {
                     d.createNewFile();
 
-                    try (InputStream is = getClass().getClassLoader().getResourceAsStream("default-lang.yml");
-                         OutputStream os = new FileOutputStream(d)) {
+                    InputStream is = null;
+                    try {
+                        is = getClass().getClassLoader().getResourceAsStream("default-lang.yml");
+                        OutputStream os = new FileOutputStream(d);
                         ByteStreams.copy(is, os);
+                    } finally {
+                        if (is != null)
+                            is.close();
                     }
                 }
 
-                Configuration def = ConfigurationProvider.getProvider(YamlConfiguration.class).load(getClass().getClassLoader().getResourceAsStream("default-lang.yml"));
+                InputStream a = getClass().getClassLoader().getResourceAsStream("default-lang.yml");
+                Configuration def = ConfigurationProvider.getProvider(YamlConfiguration.class).load(a);
                 this.lang = ConfigurationProvider.getProvider(YamlConfiguration.class).load(d, def);
+                a.close();
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -319,6 +332,8 @@ public class MCSCore {
                 }
             }
         },0,1000);
+
+        registerCommands();
     }
 
     public void end() {
@@ -401,18 +416,81 @@ public class MCSCore {
         return new MCSPlayer(data);
     }
 
+    private void registerCommands() {
+        if (getServer().getClass().getName().startsWith("MCSBungeeServer"))
+            registerCommand(new Jump("jump"));
+
+        registerCommand(new Kick("kick"));
+
+        registerCommand(new MuteCustom("cmute"));
+        registerCommand(new Mute("mute"));
+        registerCommand(new MuteRemove("unmute"));
+
+        registerCommand(new BanCustom("cban"));
+        registerCommand(new Ban("ban"));
+        registerCommand(new BanRemove("unban"));
+    }
+
+    private void registerCommand(Command command) {
+        commandMap.put(command.getName().toLowerCase(), command);
+
+        if (command.getAliases() != null)
+            Arrays.stream(command.getAliases()).forEach(alias -> this.commandMap.put(alias.toLowerCase(), command));
+    }
+
+    private void unregisterCommand(Command command) {
+        while(commandMap.values().remove(command)) {
+        }
+    }
+
+    public boolean dispatchCommand(MCSEntity sender, String commandLine) {
+        String[] split = argsSplit.split(commandLine, -1);
+        if (split.length == 0) {
+            return false;
+        } else {
+            String name = split[0].toLowerCase();
+            String[] args = Arrays.copyOfRange(split, 1, split.length);
+
+            return dispatchCommand(sender, name, args);
+        }
+    }
+
+
+    public boolean dispatchCommand(MCSEntity sender, String name, String[] args) {
+        Command command = commandMap.get(name);
+        if (command == null) {
+            return false;
+        } else {
+            String permission = command.getPermission();
+            if (permission != null && !permission.isEmpty() && !sender.hasPermission(permission)) {
+                sender.sendMessage("no_permission");
+
+                return true;
+            } else {
+                try {
+                    command.execute(sender, args);
+                } catch (Exception var11) {
+                    sender.sendMessage(ChatColor.RED + "An internal error occurred whilst executing this command, please check the console log for details.");
+                    var11.printStackTrace();
+                }
+
+                return true;
+            }
+        }
+    }
+
     public MuteTemplate creaeteMuteTemplate() {
         return null;
     }
 
     public MuteTemplate getMuteTemplateByID(String id) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `id`=? LIMIT 1", Arrays.asList(id));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `id`=? LIMIT 1", id);
         if (!rs.next())
             return null;
         return new MuteTemplate(rs);
     }
     public MuteTemplate getMuteTemplateByName(String name) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name`=? LIMIT 1", Arrays.asList(name));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name`=? LIMIT 1", name);
         if (!rs.next())
             return null;
         return new MuteTemplate(rs);
@@ -420,7 +498,7 @@ public class MCSCore {
     public MuteTemplate[] getMuteTemplatesByName(String name) throws SQLException {
         List<MuteTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ?", Arrays.asList(name + "%"));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ?",name + "%");
         while (rs.next())
             templates.add(new MuteTemplate(rs));
 
@@ -435,7 +513,7 @@ public class MCSCore {
     public MuteTemplate[] getMuteTemplates(String name, int power) throws SQLException {
         List<MuteTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ? && `power`<=?", Arrays.asList(name + "%", power));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ? && `power`<=?", name + "%", power);
         while (rs.next())
             templates.add(new MuteTemplate(rs));
 
@@ -444,7 +522,7 @@ public class MCSCore {
         return tp;
     }
     public MuteTemplate getMuteTemplateByPower(int minPower) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `power`<=? LIMIT 1", Arrays.asList(minPower));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `power`<=? LIMIT 1", minPower);
         if (!rs.next())
             return null;
         return new MuteTemplate(rs);
@@ -494,13 +572,13 @@ public class MCSCore {
 
 
     public BanTemplate getBanTemplateByID(String id) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `id`=? LIMIT 1", Arrays.asList(id));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `id`=? LIMIT 1", id);
         if (!rs.next())
             return null;
         return new BanTemplate(rs);
     }
     public BanTemplate getBanTemplateByName(String name) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name`=? LIMIT 1", Arrays.asList(name));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name`=? LIMIT 1", name);
         if (!rs.next())
             return null;
         return new BanTemplate(rs);
@@ -508,7 +586,7 @@ public class MCSCore {
     public BanTemplate[] getBanTemplatesByName(String name) throws SQLException {
         List<BanTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ?", Arrays.asList(name + "%"));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ?", name + "%");
         while (rs.next())
             templates.add(new BanTemplate(rs));
 
@@ -522,7 +600,7 @@ public class MCSCore {
     public BanTemplate[] getBanTemplates(String name, int power) throws SQLException {
         List<BanTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ? && `power`<=?", Arrays.asList(name + "%", power));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ? && `power`<=?", name + "%", power);
         while (rs.next())
             templates.add(new BanTemplate(rs));
 
@@ -531,7 +609,7 @@ public class MCSCore {
         return tp;
     }
     public BanTemplate getBanTemplateByPower(int minPower) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `power`<=? LIMIT 1", Arrays.asList(minPower));
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `power`<=? LIMIT 1", minPower);
         if (!rs.next())
             return null;
         return new BanTemplate(rs);

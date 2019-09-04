@@ -1,21 +1,41 @@
 package net.mcstats2.core.api.MCSServer;
 
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.MCSEntity.MCSConsole;
+import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
+import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
+import net.md_5.bungee.api.event.ChatEvent;
+import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
+import org.bukkit.event.EventHandler;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-public class MCSBungeeServer implements MCSServer {
+public class MCSBungeeServer implements MCSServer, Listener {
     private Plugin plugin;
 
     public MCSBungeeServer(Plugin plugin) {
         this.plugin = plugin;
+
+        plugin.getProxy().getPluginManager().registerListener(plugin, this);
+    }
+
+    @EventHandler
+    public void on(ChatEvent e) throws InterruptedException, ExecutionException, IOException {
+        MCSEntity s;
+        if (e.getSender() instanceof ProxiedPlayer)
+            s = MCSCore.getInstance().getPlayer(((ProxiedPlayer)e.getSender()).getUniqueId());
+        else
+            s = new MCSConsole();
+
+        if (e.getMessage().startsWith("/"))
+            e.setCancelled(MCSCore.getInstance().dispatchCommand(s, e.getMessage()));
     }
 
     @Override
@@ -70,9 +90,7 @@ public class MCSBungeeServer implements MCSServer {
         for(ProxiedPlayer pp : plugin.getProxy().getPlayers())
             data.add(MCSCore.getInstance().getPlayer(pp.getUniqueId()));
 
-        MCSPlayer[] players = new MCSPlayer[data.size()];
-        data.toArray(players);
-        return players;
+        return data.toArray(new MCSPlayer[0]);
     }
 
     @Override
@@ -111,5 +129,15 @@ public class MCSBungeeServer implements MCSServer {
     @Override
     public void sendConsole(String message) {
         plugin.getProxy().getConsole().sendMessage(TextComponent.fromLegacyText(message));
+    }
+
+    public boolean dispatchCommand(CommandSender cs, String cmd, String[] args) throws InterruptedException, ExecutionException, IOException {
+        MCSEntity s;
+        if (cs instanceof ProxiedPlayer)
+            s = MCSCore.getInstance().getPlayer(((ProxiedPlayer)cs).getUniqueId());
+        else
+            s = new MCSConsole();
+
+        return MCSCore.getInstance().dispatchCommand(s, cmd, args);
     }
 }
