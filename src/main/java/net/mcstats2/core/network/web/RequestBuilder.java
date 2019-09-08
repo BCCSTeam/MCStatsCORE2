@@ -1,5 +1,6 @@
 package net.mcstats2.core.network.web;
 
+import net.mcstats2.core.MCSCore;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
@@ -21,34 +22,23 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-public class RequestBuilder {
+public class RequestBuilder implements Cloneable {
     private String request;
     private HashMap<String, Object> headers = new HashMap<>();
     private HashMap<String, Object> params = new HashMap<>();
+    private HashMap<String, ArrayList<Object>> paramsArray = new HashMap<>();
 
     private HttpAsyncClientBuilder client = HttpAsyncClients.custom();
 
     public RequestBuilder(String request) {
         this.request = request;
+
+        client.setUserAgent("MCStatsCORE2/" + MCSCore.getInstance().getServer().getDescription().getVersion());
     }
 
-    private List<NameValuePair> createParams() {
-        List<NameValuePair> values = new ArrayList<NameValuePair>();
-        for (Map.Entry<String, Object> arg: params.entrySet())
-            values.add(new BasicNameValuePair(arg.getKey(), arg.getValue().toString()));
-        return values;
-    }
 
-    public boolean putParam(String key, Object value) {
-        params.put(key, value);
-
-        return params.containsKey(key) && params.get(key).equals(value);
-    }
-
-    public boolean removeParam(String key) {
-        params.remove(key);
-
-        return !params.containsKey(key);
+    public void mergeHeaders(HashMap<String, Object> headers) {
+        params.forEach(this::putHeader);
     }
 
     public boolean putHeader(String key, Object value) {
@@ -61,6 +51,43 @@ public class RequestBuilder {
         headers.remove(key);
 
         return !headers.containsKey(key);
+    }
+
+
+    private List<NameValuePair> createParams() {
+        List<NameValuePair> values = new ArrayList<>();
+
+        params.forEach((key, data) -> values.add(new BasicNameValuePair(key, data.toString())));
+        paramsArray.forEach((key, entry) -> entry.forEach(data -> values.add(new BasicNameValuePair(key, data.toString()))));
+
+        return values;
+    }
+
+    public void mergeParams(HashMap<String, Object> params) {
+        params.forEach(this::putParam);
+    }
+
+    public boolean putParam(String key, Object value) {
+        if (key.endsWith("[]"))
+            return addParamArray(key, value);
+        else
+            params.put(key, value);
+
+        return params.containsKey(key) && params.get(key).equals(value);
+    }
+
+    public boolean addParamArray(String key, Object value) {
+        ArrayList<Object> params = paramsArray.containsKey(key) ? paramsArray.get(key) : new ArrayList<>();
+        params.add(value);
+        paramsArray.put(key, params);
+
+        return paramsArray.containsKey(key) && params.contains(value);
+    }
+
+    public boolean removeParam(String key) {
+        params.remove(key);
+
+        return !params.containsKey(key);
     }
 
 
@@ -164,5 +191,9 @@ public class RequestBuilder {
         } finally {
             client.close();
         }
+    }
+
+    public RequestBuilder clone() throws CloneNotSupportedException {
+        return (RequestBuilder) super.clone();
     }
 }
