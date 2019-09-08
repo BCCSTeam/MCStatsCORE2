@@ -12,18 +12,15 @@ import net.mcstats2.core.api.config.YamlConfiguration;
 import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
 import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
-import net.mcstats2.core.network.web.MCSData.MCSFilterData;
+import net.mcstats2.core.network.web.data.MCSFilterData;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 

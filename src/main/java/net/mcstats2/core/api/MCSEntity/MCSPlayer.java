@@ -2,7 +2,7 @@ package net.mcstats2.core.api.MCSEntity;
 
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.config.Configuration;
-import net.mcstats2.core.network.web.MCSData.MCSPlayerData;
+import net.mcstats2.core.network.web.data.MCSPlayerData;
 import net.mcstats2.core.network.web.RequestBuilder;
 
 import java.io.IOException;

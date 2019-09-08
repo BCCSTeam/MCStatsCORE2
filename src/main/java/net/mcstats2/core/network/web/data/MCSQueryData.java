@@ -1,4 +1,4 @@
-package net.mcstats2.core.network.web.MCSData;
+package net.mcstats2.core.network.web.data;
 
 import com.google.gson.annotations.SerializedName;
 import net.mcstats2.core.MCSCore;

@@ -1,4 +1,4 @@
-package net.mcstats2.core.network.web.MCSData;
+package net.mcstats2.core.network.web.data;
 
 public class MCSFilterData {
     private FilterDescription description;
