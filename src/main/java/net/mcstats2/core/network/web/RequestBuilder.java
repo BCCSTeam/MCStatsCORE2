@@ -91,6 +91,11 @@ public class RequestBuilder implements Cloneable {
     }
 
 
+    public String getURL() {
+        return request;
+    }
+
+
     public RequestResponse get() throws IOException, InterruptedException, ExecutionException {
         CloseableHttpAsyncClient client = this.client.build();
 

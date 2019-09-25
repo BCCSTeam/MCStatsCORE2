@@ -10,7 +10,7 @@ import net.mcstats2.core.api.Command;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSSystem;
 import net.mcstats2.core.api.MCSServer.MCSServer;
-import net.mcstats2.core.api.MySQL.MySQL;
+import net.mcstats2.core.network.mysql.MySQL;
 import net.mcstats2.core.api.commands.*;
 import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
@@ -109,13 +109,27 @@ public class MCSCore {
         if (license.getString("GUID")==null || license.getString("GUID").isEmpty() || license.getString("Secret")==null || license.getString("Secret").isEmpty()) {
             RequestBuilder rb = new RequestBuilder(API_SERVER + "register");
 
-            rb.putParam("server-port", server.getServerDetails().getPort());
-            rb.putParam("server-onlinemode", server.getServerDetails().isOnlineMode());
-            rb.putParam("server-type", server.getServerDetails().getType().name());
-            rb.putParam("server-version", server.getServerDetails().getVersion());
-            rb.putParam("plugin-name", server.getDescription().getName());
-            rb.putParam("plugin-author", server.getDescription().getAuthor());
-            rb.putParam("plugin-version", server.getDescription().getVersion());
+            rb.putParam("details[os][java]", System.getProperty("java.version"));
+            rb.putParam("details[os][name]", System.getProperty("os.name"));
+            rb.putParam("details[os][arch]", System.getProperty("os.arch"));
+            rb.putParam("details[os][version]", System.getProperty("os.version"));
+            rb.putParam("details[os][cores]", Runtime.getRuntime().availableProcessors());
+
+            rb.putParam("details[server][port]", server.getServerDetails().getPort());
+            rb.putParam("details[server][onlinemode]", server.getServerDetails().isOnlineMode());
+            rb.putParam("details[server][type]", server.getServerDetails().getType().name());
+            rb.putParam("details[server][version]", server.getServerDetails().getVersion());
+
+            long freeMem = Runtime.getRuntime().freeMemory();
+            long maxMem = Runtime.getRuntime().maxMemory();
+            rb.putParam("details[memory][free]", freeMem);
+            rb.putParam("details[memory][used]", maxMem - freeMem);
+            rb.putParam("details[memory][total]", Runtime.getRuntime().totalMemory());
+            rb.putParam("details[memory][max]", maxMem);
+
+            rb.putParam("details[plugin][name]", server.getDescription().getName());
+            rb.putParam("details[plugin][author]", server.getDescription().getAuthor());
+            rb.putParam("details[plugin][version]", server.getDescription().getVersion());
 
             RequestResponse rr = rb.post();
 
@@ -159,13 +173,27 @@ public class MCSCore {
 
             RequestBuilder rb = getAuthedRequest("auth");
 
-            rb.putParam("server-port", server.getServerDetails().getPort());
-            rb.putParam("server-onlinemode", server.getServerDetails().isOnlineMode());
-            rb.putParam("server-type", server.getServerDetails().getType().name());
-            rb.putParam("server-version", server.getServerDetails().getVersion());
-            rb.putParam("plugin-name", server.getDescription().getName());
-            rb.putParam("plugin-author", server.getDescription().getAuthor());
-            rb.putParam("plugin-version", server.getDescription().getVersion());
+            rb.putParam("details[os][java]", System.getProperty("java.version"));
+            rb.putParam("details[os][name]", System.getProperty("os.name"));
+            rb.putParam("details[os][arch]", System.getProperty("os.arch"));
+            rb.putParam("details[os][version]", System.getProperty("os.version"));
+            rb.putParam("details[os][cores]", Runtime.getRuntime().availableProcessors());
+
+            rb.putParam("details[server][port]", server.getServerDetails().getPort());
+            rb.putParam("details[server][onlinemode]", server.getServerDetails().isOnlineMode());
+            rb.putParam("details[server][type]", server.getServerDetails().getType().name());
+            rb.putParam("details[server][version]", server.getServerDetails().getVersion());
+
+            long freeMem = Runtime.getRuntime().freeMemory();
+            long maxMem = Runtime.getRuntime().maxMemory();
+            rb.putParam("details[memory][free]", freeMem);
+            rb.putParam("details[memory][used]", maxMem - freeMem);
+            rb.putParam("details[memory][total]", Runtime.getRuntime().totalMemory());
+            rb.putParam("details[memory][max]", maxMem);
+
+            rb.putParam("details[plugin][name]", server.getDescription().getName());
+            rb.putParam("details[plugin][author]", server.getDescription().getAuthor());
+            rb.putParam("details[plugin][version]", server.getDescription().getVersion());
 
             RequestResponse rr = rb.post();
 
@@ -241,6 +269,11 @@ public class MCSCore {
                         players += p.getUUID().toString();
                     }
                     rb.putParam("players", players);
+
+                    long freeMem = Runtime.getRuntime().freeMemory();
+                    long maxMem = Runtime.getRuntime().maxMemory();
+                    rb.putParam("details[memory][free]", freeMem);
+                    rb.putParam("details[memory][used]", maxMem - freeMem);
 
                     MCSQueryData data = pharseQuery(rb.post());
 

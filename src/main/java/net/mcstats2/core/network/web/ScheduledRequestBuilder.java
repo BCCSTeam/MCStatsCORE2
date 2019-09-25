@@ -47,41 +47,44 @@ public class ScheduledRequestBuilder {
             @Override
             public void run() {
                 boolean run = false;
-                if (queue.size() < max || System.currentTimeMillis() < next_run) {
-                    schedule();
+                if (queue.size() < max || System.currentTimeMillis() < next_run)
                     return;
-                }
 
-                last_run = System.currentTimeMillis();
-                next_run = last_run + delay;
-
-                ArrayList<RequestBuilder> q = (ArrayList<RequestBuilder>) queue.clone();
-                queue.clear();
-
-                q.forEach(request -> {
-                    try {
-                        switch (method) {
-                            case GET:
-                                request.get();
-                                break;
-                            case POST:
-                                request.post();
-                                break;
-                            case PUT:
-                                request.put();
-                                break;
-                            case DELETE:
-                                request.delete();
-                                break;
-                        }
-                    } catch (IOException | InterruptedException | ExecutionException e) {
-                        e.printStackTrace();
-                    }
-                });
-
-                schedule();
+                forcePush();
             }
-        }, 500);
+        }, 500, 500);
+    }
+
+    public void forcePush() {
+        if (queue.size() == 0)
+            return;
+
+        last_run = System.currentTimeMillis();
+        next_run = last_run + delay;
+
+        ArrayList<RequestBuilder> q = (ArrayList<RequestBuilder>) queue.clone();
+        queue.clear();
+
+        q.forEach(request -> {
+            try {
+                switch (method) {
+                    case GET:
+                        request.get();
+                        break;
+                    case POST:
+                        request.post();
+                        break;
+                    case PUT:
+                        request.put();
+                        break;
+                    case DELETE:
+                        request.delete();
+                        break;
+                }
+            } catch (IOException | InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     public boolean addToQueue(Entry entry) {

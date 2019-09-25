@@ -26,18 +26,6 @@ public class MCSBungeeServer implements MCSServer, Listener {
         plugin.getProxy().getPluginManager().registerListener(plugin, this);
     }
 
-    @EventHandler
-    public void on(ChatEvent e) throws InterruptedException, ExecutionException, IOException {
-        MCSEntity s;
-        if (e.getSender() instanceof ProxiedPlayer)
-            s = MCSCore.getInstance().getPlayer(((ProxiedPlayer)e.getSender()).getUniqueId());
-        else
-            s = new MCSConsole();
-
-        if (e.getMessage().startsWith("/"))
-            e.setCancelled(MCSCore.getInstance().dispatchCommand(s, e.getMessage()));
-    }
-
     @Override
     public PluginDescription getDescription() {
         return new PluginDescription() {

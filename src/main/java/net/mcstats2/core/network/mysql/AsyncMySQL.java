@@ -1,8 +1,7 @@
-package net.mcstats2.core.api.MySQL;
+package net.mcstats2.core.network.mysql;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.List;
 import java.util.function.Consumer;
 
 public interface AsyncMySQL {

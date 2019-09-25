@@ -8,7 +8,7 @@ import net.mcstats2.bridge.server.bungee.listeners.PlayerJoin;
 import net.mcstats2.bridge.server.bungee.listeners.PlayerQuit;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSServer.MCSBungeeServer;
-import net.mcstats2.core.api.MySQL.AsyncBungeeMySQL;
+import net.mcstats2.core.network.mysql.AsyncBungeeMySQL;
 import net.mcstats2.core.network.web.data.MCSFilterData;
 import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;

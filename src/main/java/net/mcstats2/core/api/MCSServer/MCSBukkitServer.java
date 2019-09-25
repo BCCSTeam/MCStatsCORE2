@@ -2,7 +2,6 @@ package net.mcstats2.core.api.MCSServer;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import net.mcstats2.bridge.server.bungee.listeners.PlayerQuit;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.ChatColor;
 import net.mcstats2.core.api.MCSEntity.MCSConsole;
@@ -34,7 +33,8 @@ public class MCSBukkitServer implements MCSServer, Listener {
     }
 
     @EventHandler
-    public void on(PlayerLoginEvent e) throws Exception {{
+    public void on(PlayerLoginEvent e) {
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 Player pp = e.getPlayer();
 
@@ -151,17 +151,10 @@ public class MCSBukkitServer implements MCSServer, Listener {
                         }
                     }
                 }
-
-                JsonObject data = new JsonObject();
-                JsonObject chat = new JsonObject();
-                chat.addProperty("last_message", 0);
-                chat.add("history", new JsonArray());
-                data.add("chat", chat);
-                //plugin.players.add(player.getUUID().toString(), data);
             } catch (SQLException | InterruptedException | ExecutionException | IOException ex) {
                 ex.printStackTrace();
             }
-        }   
+        });
     }
 
     @EventHandler

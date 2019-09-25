@@ -1,20 +1,20 @@
-package net.mcstats2.core.api.MySQL;
+package net.mcstats2.core.network.mysql;
 
-import net.md_5.bungee.api.plugin.Plugin;
+import org.bukkit.plugin.Plugin;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
-public class AsyncBungeeMySQL implements AsyncMySQL {
+
+public class AsyncBukkitMySQL implements AsyncMySQL {
     private ExecutorService executor;
     private Plugin plugin;
     private MySQL sql;
 
-    public AsyncBungeeMySQL(Plugin owner, String host, int port, String user, String password, String database) {
+    public AsyncBukkitMySQL(Plugin owner, String host, int port, String user, String password, String database) {
         try {
             sql = new MySQL(host, port, user, password, database);
             executor = Executors.newCachedThreadPool();
@@ -43,7 +43,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     public void update(PreparedStatement statement, Consumer<Integer> consumer) {
         executor.execute(() -> {
             int result = sql.queryUpdate(statement);
-            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+            plugin.getServer().getScheduler().runTask(plugin, () -> consumer.accept(result));
         });
     }
 
@@ -51,7 +51,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     public void update(String statement, Consumer<Integer> consumer) {
         executor.execute(() -> {
             int result = sql.queryUpdate(statement);
-            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+            plugin.getServer().getScheduler().runTask(plugin, () -> consumer.accept(result));
         });
     }
 
@@ -59,7 +59,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     public void update(String statement, Consumer<Integer> consumer, Object... args) {
         executor.execute(() -> {
             int result = sql.queryUpdate(statement, args);
-            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+            plugin.getServer().getScheduler().runTask(plugin, () -> consumer.accept(result));
         });
     }
 
@@ -67,7 +67,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     public void query(PreparedStatement statement, Consumer<ResultSet> consumer) {
         executor.execute(() -> {
             ResultSet result = sql.query(statement);
-            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+            plugin.getServer().getScheduler().runTask(plugin, () -> consumer.accept(result));
         });
     }
 
@@ -75,7 +75,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     public void query(String statement, Consumer<ResultSet> consumer) {
         executor.execute(() -> {
             ResultSet result = sql.query(statement);
-            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+            plugin.getServer().getScheduler().runTask(plugin, () -> consumer.accept(result));
         });
     }
 
@@ -83,7 +83,7 @@ public class AsyncBungeeMySQL implements AsyncMySQL {
     public void query(String statement, Consumer<ResultSet> consumer, Object... args) {
         executor.execute(() -> {
             ResultSet result = sql.query(statement, args);
-            plugin.getProxy().getScheduler().runAsync(plugin, () -> consumer.accept(result));
+            plugin.getServer().getScheduler().runTask(plugin, () -> consumer.accept(result));
         });
     }
 

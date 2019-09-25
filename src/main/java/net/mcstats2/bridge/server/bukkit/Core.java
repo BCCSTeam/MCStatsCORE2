@@ -5,7 +5,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSServer.MCSBukkitServer;
-import net.mcstats2.core.api.MySQL.AsyncBukkitMySQL;
+import net.mcstats2.core.network.mysql.AsyncBukkitMySQL;
 import net.mcstats2.core.api.config.Configuration;
 import net.mcstats2.core.api.config.ConfigurationProvider;
 import net.mcstats2.core.api.config.YamlConfiguration;
@@ -13,13 +13,10 @@ import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
 import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
 import net.mcstats2.core.network.web.data.MCSFilterData;
-import org.bukkit.Bukkit;
-import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -61,7 +58,7 @@ public class Core extends JavaPlugin {
 
         mysql = new AsyncBukkitMySQL(this, config.getString("MySQL.hostname"), config.getInt("MySQL.port"), config.getString("MySQL.username"), config.getString("MySQL.password"), config.getString("MySQL.database"));
         if (mysql.getMySQL().isConnected())
-            //console.sendMessage("§aDatabase connected!");
+        //console.sendMessage("§aDatabase connected!");
         {} else {
             //console.sendMessage("§aDatabase connection failure!");
             getServer().shutdown();
@@ -105,36 +102,21 @@ public class Core extends JavaPlugin {
                 }
             }
         }
-        
-        //getServer().getPluginManager().registerListener(this, new PlayerJoin(this));
-        //getServer().getPluginManager().registerListener(this, new PlayerQuit(this));
-
-        /*if (config.getBoolean("Modules.ChatFilter.enabled"))
-            getServer().getPluginManager().registerListener(this, new ChatFilter(this));*/
 
 
-        try {
-            final Field bukkitCommandMap = Bukkit.getServer().getClass().getDeclaredField("commandMap");
+        if (config.getBoolean("Modules.Kick.enabled"))
+            getCommand("kick").setExecutor(new CommandManager());
 
-            bukkitCommandMap.setAccessible(true);
-            CommandMap commandMap = (CommandMap) bukkitCommandMap.get(Bukkit.getServer());
+        if (config.getBoolean("Modules.Mute.enabled")) {
+            getCommand("cmute").setExecutor(new CommandManager());
+            getCommand("mute").setExecutor(new CommandManager());
+            getCommand("unmute").setExecutor(new CommandManager());
+        }
 
-            if (config.getBoolean("Modules.Kick.enabled"))
-                commandMap.register("kick", new CommandManager("kick", null, null, new ArrayList<String>()));
-
-            if (config.getBoolean("Modules.Mute.enabled")) {
-                commandMap.register("cmute", new CommandManager("cmute", null, null, new ArrayList<String>()));
-                commandMap.register("mute", new CommandManager("mute", null, null, new ArrayList<String>()));
-                commandMap.register("unmute", new CommandManager("unmute", null, null, new ArrayList<String>()));
-            }
-
-            if (config.getBoolean("Modules.Ban.enabled")) {
-                commandMap.register("cban", new CommandManager("cban", null, null, new ArrayList<String>()));
-                commandMap.register("ban", new CommandManager("ban", null, null, new ArrayList<String>()));
-                commandMap.register("unban", new CommandManager("unban", null, null, new ArrayList<String>()));
-            }
-        } catch(Exception e) {
-            e.printStackTrace();
+        if (config.getBoolean("Modules.Ban.enabled")) {
+            getCommand("cban").setExecutor(new CommandManager());
+            getCommand("ban").setExecutor(new CommandManager());
+            getCommand("unban").setExecutor(new CommandManager());
         }
     }
 

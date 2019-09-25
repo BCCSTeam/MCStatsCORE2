@@ -1,8 +1,7 @@
-package net.mcstats2.core.api.MySQL;
+package net.mcstats2.core.network.mysql;
 
 
 import java.sql.*;
-import java.util.List;
 
 public class MySQL {
 

@@ -6,7 +6,7 @@ authors: []
 website: https://www.mcstats.net
 
 main: net.mcstats2.bridge.server.bukkit.Core
-xyz:
+commands:
   mcstats:
     usage: </command>
   info:
@@ -20,6 +20,10 @@ xyz:
   cmute:
     usage: </command>
   cban:
+    usage: </command>
+  unmute:
+    usage: </command>
+  unban:
     usage: </command>
   alt:
     usage: </command>
