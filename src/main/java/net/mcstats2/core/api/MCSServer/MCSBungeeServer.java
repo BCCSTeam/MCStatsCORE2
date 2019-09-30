@@ -1,5 +1,9 @@
 package net.mcstats2.core.api.MCSServer;
 
+import cloud.timo.TimoCloud.api.TimoCloudAPI;
+import de.dytanic.cloudnet.api.CloudAPI;
+import de.dytanic.cloudnet.lib.server.ProxyGroupMode;
+import de.dytanic.cloudnet.lib.server.ServerGroupMode;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSEntity.MCSConsole;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
@@ -12,8 +16,10 @@ import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
 import org.bukkit.event.EventHandler;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -29,6 +35,11 @@ public class MCSBungeeServer implements MCSServer, Listener {
     @Override
     public PluginDescription getDescription() {
         return new PluginDescription() {
+            @Override
+            public File getPlugin() {
+                return plugin.getFile();
+            }
+
             @Override
             public String getName() {
                 return plugin.getDescription().getName();
@@ -49,6 +60,84 @@ public class MCSBungeeServer implements MCSServer, Listener {
     @Override
     public ServerDetails getServerDetails() {
         return new ServerDetails() {
+
+            @Override
+            public boolean isCloudSystem() {
+                if (isPluginEnabled("CloudNetAPI"))
+                    return true;
+
+                if (isPluginEnabled("TimoCloudAPI"))
+                    return true;
+
+                return false;
+            }
+
+            @Override
+            public CloudDetails getCloudSystem() {
+                if (!isCloudSystem())
+                    return null;
+
+                return new CloudDetails() {
+                    @Override
+                    public String getId() {
+                        if (isPluginEnabled("CloudNetAPI"))
+                            return String.valueOf(CloudAPI.getInstance().getServiceId().getId());
+
+                        if (isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBungeeAPI().getThisProxy().getId();
+
+                        return null;
+                    }
+
+                    @Override
+                    public String getWrapperId() {
+                        if (isPluginEnabled("CloudNetAPI"))
+                            return CloudAPI.getInstance().getWrapperId();
+
+                        if (isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBungeeAPI().getThisProxy().getBase();
+
+                        return null;
+                    }
+
+                    @Override
+                    public String getGroup() {
+                        if (isPluginEnabled("CloudNetAPI"))
+                            return CloudAPI.getInstance().getGroup();
+
+                        if (isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBungeeAPI().getThisProxy().getName();
+
+                        if (plugin.getProxy().getName().isEmpty())
+                            return "Bungee";
+
+                        return plugin.getProxy().getName();
+                    }
+
+                    @Override
+                    public boolean isStatic() {
+                        if (isPluginEnabled("CloudNetAPI"))
+                            return CloudAPI.getInstance().getProxyGroupData(CloudAPI.getInstance().getGroup()).getProxyGroupMode().equals(ProxyGroupMode.STATIC);
+
+                        if (isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBungeeAPI().getThisProxy().getGroup().isStatic();
+
+                        return true;
+                    }
+
+                    @Override
+                    public CloudType getType() {
+                        if (isPluginEnabled("CloudNetAPI"))
+                            return CloudType.CLOUDNET;
+
+                        if (isPluginEnabled("TimoCloudAPI"))
+                            return CloudType.TIMOCLOUD;
+
+                        return null;
+                    }
+                };
+            }
+
             @Override
             public int getPort() {
                 return plugin.getProxy().getConfig().getListeners().iterator().next().getHost().getPort();
@@ -69,6 +158,16 @@ public class MCSBungeeServer implements MCSServer, Listener {
                 return plugin.getProxy().getVersion();
             }
         };
+    }
+
+    @Override
+    public void shutdown(String message) {
+        plugin.getProxy().stop(message);
+    }
+
+    @Override
+    public void shutdown() {
+        plugin.getProxy().stop();
     }
 
     @Override
@@ -127,5 +226,14 @@ public class MCSBungeeServer implements MCSServer, Listener {
             s = new MCSConsole();
 
         return MCSCore.getInstance().dispatchCommand(s, cmd, args);
+    }
+    
+    private boolean isPluginEnabled(String name) {
+        for (Plugin plugin1 : plugin.getProxy().getPluginManager().getPlugins()) {
+            if (plugin1.getDescription().getName().equalsIgnoreCase(name))
+                return true;
+        }
+        
+        return false;
     }
 }

@@ -1,9 +1,11 @@
-name: MCStatsCORE2
-version: 1.0
+name: ${project.artifactId}
+version: ${project.version}
 
 author: BCCS-Team
 authors: []
 website: https://www.mcstats.net
+
+softdepend: [CloudNetAPI, TimoCloudAPI]
 
 main: net.mcstats2.bridge.server.bukkit.Core
 commands:

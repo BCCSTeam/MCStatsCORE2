@@ -5,9 +5,13 @@ MySQL:
   username: 'MCS'
   password: 'pass123'
 
+auto-updater:
+  enabled: true
+  auto-restart: true
+
 Modules:
   Legally:
-    enabled: true
+    enabled: false
     needToAccept: true
     onNotAccepted:
       diallow-movements: true

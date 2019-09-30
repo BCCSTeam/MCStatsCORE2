@@ -1,19 +1,26 @@
 package net.mcstats2.core.network.web;
 
+import com.google.common.io.ByteStreams;
 import net.mcstats2.core.MCSCore;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.client.LaxRedirectStrategy;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 
-import java.io.IOException;
+import java.io.*;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,7 +35,7 @@ public class RequestBuilder implements Cloneable {
     private HashMap<String, Object> params = new HashMap<>();
     private HashMap<String, ArrayList<Object>> paramsArray = new HashMap<>();
 
-    private HttpAsyncClientBuilder client = HttpAsyncClients.custom();
+    private HttpAsyncClientBuilder client = HttpAsyncClients.custom().setRedirectStrategy(new LaxRedirectStrategy());
 
     public RequestBuilder(String request) {
         this.request = request;
@@ -198,7 +205,63 @@ public class RequestBuilder implements Cloneable {
         }
     }
 
+    public File download(File dstFile) throws IOException, InterruptedException, ExecutionException {
+        CloseableHttpClient client = HttpClients.custom()
+                .setRedirectStrategy(new LaxRedirectStrategy()) // adds HTTP REDIRECT support to GET and POST methods
+                .build();
+
+        String params = "";
+        for (NameValuePair value : createParams()) {
+            if (params == "")
+                params += "?";
+            else
+                params += "&";
+
+            params += URLEncoder.encode(value.getName(), "UTF-8") + "=" + URLEncoder.encode(value.getValue(), "UTF-8");
+        }
+
+        try {
+            HttpPost http = new HttpPost(request + params);
+
+            for (Map.Entry<String, Object> arg : headers.entrySet())
+                http.addHeader(new BasicHeader(arg.getKey(), arg.getValue().toString()));
+
+            File downloaded = client.execute(http, new FileDownloadResponseHandler(dstFile));
+        } finally {
+            client.close();
+        }
+
+        return null;
+    }
+
     public RequestBuilder clone() throws CloneNotSupportedException {
         return (RequestBuilder) super.clone();
+    }
+
+
+
+    static class FileDownloadResponseHandler implements ResponseHandler<File> {
+
+        private File target;
+
+        public FileDownloadResponseHandler(File target) {
+            this.target = target;
+        }
+
+        @Override
+        public File handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
+            InputStream is = response.getEntity().getContent();
+
+            try {
+                OutputStream os = new FileOutputStream(target);
+                ByteStreams.copy(is, os);
+            } finally {
+                if (is != null)
+                    is.close();
+            }
+
+            return this.target;
+        }
+
     }
 }

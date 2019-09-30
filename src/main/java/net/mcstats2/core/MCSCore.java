@@ -1,6 +1,7 @@
 package net.mcstats2.core;
 
 import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -9,12 +10,14 @@ import net.mcstats2.core.api.ChatColor;
 import net.mcstats2.core.api.Command;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSSystem;
+import net.mcstats2.core.api.MCSServer.MCSBungeeServer;
 import net.mcstats2.core.api.MCSServer.MCSServer;
 import net.mcstats2.core.network.mysql.MySQL;
 import net.mcstats2.core.api.commands.*;
 import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
 import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
+import net.mcstats2.core.network.web.data.MCSAuthData;
 import net.mcstats2.core.network.web.data.MCSPlayerData;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
 import net.mcstats2.core.network.web.data.MCSQueryData;
@@ -23,6 +26,8 @@ import net.mcstats2.core.network.web.RequestResponse;
 import net.mcstats2.core.api.config.Configuration;
 import net.mcstats2.core.api.config.ConfigurationProvider;
 import net.mcstats2.core.api.config.YamlConfiguration;
+import net.mcstats2.core.network.web.data.MCSUpdaterData;
+import net.mcstats2.core.utils.version.Version;
 
 import java.io.*;
 import java.sql.ResultSet;
@@ -38,6 +43,7 @@ public class MCSCore {
     private MySQL mysql;
 
     private String API_SERVER = "https://api.mcstats.net/v2/server/";
+    private Version API_PARSER_VERSION;
 
     private String GUID;
     private String Secret;
@@ -49,7 +55,7 @@ public class MCSCore {
 
     private Timer t = new Timer();
     private long cooldown = 0;
-    private HashMap<URLType, String> urls = new HashMap<>();
+    private HashMap<MCSAuthData.Response.URL, String> urls = new HashMap<>();
 
     private ArrayList<String> running = new ArrayList<>();
     private HashMap<Integer, Long> cooldowns = new HashMap<>();
@@ -66,6 +72,8 @@ public class MCSCore {
         this.pluginDir = pluginDir;
         this.server = server;
         mysql = database;
+
+        API_PARSER_VERSION = new Version(server.getDescription().getVersion());
 
         if(!pluginDir.exists())
             pluginDir.mkdir();
@@ -109,11 +117,22 @@ public class MCSCore {
         if (license.getString("GUID")==null || license.getString("GUID").isEmpty() || license.getString("Secret")==null || license.getString("Secret").isEmpty()) {
             RequestBuilder rb = new RequestBuilder(API_SERVER + "register");
 
+            rb.putHeader("API-Parser-Version", API_PARSER_VERSION);
+
             rb.putParam("details[os][java]", System.getProperty("java.version"));
             rb.putParam("details[os][name]", System.getProperty("os.name"));
             rb.putParam("details[os][arch]", System.getProperty("os.arch"));
             rb.putParam("details[os][version]", System.getProperty("os.version"));
             rb.putParam("details[os][cores]", Runtime.getRuntime().availableProcessors());
+
+
+            rb.putParam("details[server][is_cloud]", server.getServerDetails().isCloudSystem());
+            if (server.getServerDetails().isCloudSystem()) {
+                rb.putParam("details[server][cloud][id]", server.getServerDetails().getCloudSystem().getId());
+                rb.putParam("details[server][cloud][wrapper]", server.getServerDetails().getCloudSystem().getWrapperId());
+                rb.putParam("details[server][cloud][name]", server.getServerDetails().getCloudSystem().getGroup());
+                rb.putParam("details[server][cloud][static]", server.getServerDetails().getCloudSystem().isStatic());
+            }
 
             rb.putParam("details[server][port]", server.getServerDetails().getPort());
             rb.putParam("details[server][onlinemode]", server.getServerDetails().isOnlineMode());
@@ -152,8 +171,8 @@ public class MCSCore {
 
                     server.sendConsole("");
                     server.sendConsole("§a----------{ SETUP PANEL START }----------");
-                    server.sendConsole("§a1. Create a account at: " + getUrl(URLType.REGISTER));
-                    server.sendConsole("§a2. Grant your server panel access at: " + getUrl(URLType.SERVER_ADD));
+                    server.sendConsole("§a1. Create a account at: " + urls.get(MCSAuthData.Response.URL.REGISTER));
+                    server.sendConsole("§a2. Grant your server panel access at: " + urls.get(MCSAuthData.Response.URL.SERVER_ADD));
                     server.sendConsole("");
                     server.sendConsole("§aGUID: " + GUID);
                     server.sendConsole("§aSecret: " + Secret);
@@ -178,6 +197,15 @@ public class MCSCore {
             rb.putParam("details[os][arch]", System.getProperty("os.arch"));
             rb.putParam("details[os][version]", System.getProperty("os.version"));
             rb.putParam("details[os][cores]", Runtime.getRuntime().availableProcessors());
+
+
+            rb.putParam("details[server][is_cloud]", server.getServerDetails().isCloudSystem());
+            if (server.getServerDetails().isCloudSystem()) {
+                rb.putParam("details[server][cloud][id]", server.getServerDetails().getCloudSystem().getId());
+                rb.putParam("details[server][cloud][wrapper]", server.getServerDetails().getCloudSystem().getWrapperId());
+                rb.putParam("details[server][cloud][name]", server.getServerDetails().getCloudSystem().getGroup());
+                rb.putParam("details[server][cloud][static]", server.getServerDetails().getCloudSystem().isStatic());
+            }
 
             rb.putParam("details[server][port]", server.getServerDetails().getPort());
             rb.putParam("details[server][onlinemode]", server.getServerDetails().isOnlineMode());
@@ -262,13 +290,13 @@ public class MCSCore {
                 try {
                     RequestBuilder rb = getAuthedRequest("query");
 
-                    String players = "";
+                    StringBuilder players = new StringBuilder();
                     for (MCSPlayer p : server.getPlayers()) {
-                        if (!players.isEmpty())
-                            players += ",";
-                        players += p.getUUID().toString();
+                        if (players.length() > 0)
+                            players.append(",");
+                        players.append(p.getUUID().toString());
                     }
-                    rb.putParam("players", players);
+                    rb.putParam("players", players.toString());
 
                     long freeMem = Runtime.getRuntime().freeMemory();
                     long maxMem = Runtime.getRuntime().maxMemory();
@@ -291,16 +319,14 @@ public class MCSCore {
                         server.sendConsole("§aUpdated §2serverID");
                     }
 
-                    for (MCSQueryData.Response.URL url : data.response.URLs) {
-                        urls.put(url.type, url.url);
-                    }
+                    urls = data.response.URLs;
 
                     if (!data.response.hasAdminPanel && (cooldown + 1000*60*5) <= System.currentTimeMillis()) {
                         cooldown = System.currentTimeMillis();
                         server.sendConsole("");
                         server.sendConsole("§a----------{ SETUP PANEL START }----------");
-                        server.sendConsole("§a1. Create a account at: " + getUrl(URLType.REGISTER));
-                        server.sendConsole("§a2. Grant your server panel access at: " + getUrl(URLType.SERVER_ADD));
+                        server.sendConsole("§a1. Create a account at: " + urls.get(MCSAuthData.Response.URL.REGISTER));
+                        server.sendConsole("§a2. Grant your server panel access at: " + urls.get(MCSAuthData.Response.URL.SERVER_ADD));
                         server.sendConsole("");
                         server.sendConsole("§aGUID: " + GUID);
                         server.sendConsole("§aSecret: " + Secret);
@@ -314,7 +340,10 @@ public class MCSCore {
 
                         running.add(task.id);
 
-                        if (task.type != MCSQueryData.TaskType.CREATE_MUTE_REASON && task.type != MCSQueryData.TaskType.CREATE_BAN_REASON) {
+                        if (task.type.equals(MCSQueryData.TaskType.RELOAD_PLAYER_PROFILE)) {
+                            getPlayer(task.UUID, true);
+                            updateTaskState(task, TaskState.DONE);
+                        } else if (task.type != MCSQueryData.TaskType.CREATE_MUTE_REASON && task.type != MCSQueryData.TaskType.CREATE_BAN_REASON) {
                             MCSPlayer target = getPlayer(task.UUID);
 
                             MCSEntity staff = null;
@@ -365,11 +394,59 @@ public class MCSCore {
             }
         },0,1000);
 
+        t.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    server.sendConsole("§7Checking for Update...");
+
+                    RequestBuilder rb = getAuthedRequest("updater");
+                    RequestResponse rr = rb.post();
+                    if (rr.getStatusCode() != 200)
+                        throw new MCSError(rr.getStatusLine().getReasonPhrase());
+
+                    MCSUpdaterData data = new Gson().fromJson(rr.getContent(), MCSUpdaterData.class);
+
+                    if (data.getSystem().getStatus() != 200)
+                        throw new MCSError(data.getSystem().getMessage());
+
+                    if (!API_PARSER_VERSION.isEqual(data.getResponse().getVersion())) {
+                        if (API_PARSER_VERSION.isHigherThan(data.getResponse().getVersion()))
+                            throw new MCSError("Version error! Please check manual for Updates, in cause if this error stay please contact support at support@mcstats.net and wait for future instructions!");
+
+                        runUpdate(data);
+                    } else
+                        server.sendConsole("§aRunning newest version(" + data.getResponse().getVersion() + ")!");
+                } catch (IOException | InterruptedException | ExecutionException | MCSError e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0, 1000 * 60 * 5);
+
         registerCommands();
     }
 
     public void end() {
         t.cancel();
+    }
+
+    private void runUpdate(MCSUpdaterData data) throws MCSError, IOException, ExecutionException, InterruptedException {
+        server.sendConsole("§6An new version(" + data.getResponse().getVersion() + ") is available! Downloading...");
+        if (!data.getResponse().getDownloadURL().startsWith("https://mcstats.net/") && !data.getResponse().getDownloadURL().startsWith("https://www.mcstats.net/") && !data.getResponse().getDownloadURL().startsWith("https://api.mcstats.net/"))
+            throw new MCSError("Unsafe download URL! Please check manual for Updates, in cause if this error stay please contact support at support@mcstats.net and wait for future instructions!");
+
+        File home = server instanceof MCSBungeeServer ? server.getDescription().getPlugin() : new File(server.getDescription().getPlugin(), "MCStatsCORE-" + server.getDescription().getVersion() + ".jar");
+        File a = new File(pluginDir.getPath() + "/cache/", "MCStatsCORE2-" + data.getResponse().getVersion() + ".jar");
+        RequestBuilder rb = new RequestBuilder(data.getResponse().getDownloadURL());
+        rb.download(a);
+
+        server.sendConsole("§eUpdate downloaded! Moving file(MCStatsCORE2-" + data.getResponse().getVersion() + ".jar)...");
+
+        Files.move(a, home);
+
+        server.sendConsole("§aUpdate moved! Stopping server...");
+
+        server.shutdown();
     }
 
     private void updateTaskState(MCSQueryData.Response.Task task, TaskState state) throws InterruptedException, ExecutionException, IOException {
@@ -396,6 +473,7 @@ public class MCSCore {
         RequestBuilder rb = new RequestBuilder(API_SERVER + GUID + (path.startsWith("/") ? "" : "/") + path);
         rb.putHeader("Auth-Instance", instanceID);
         rb.putHeader("Auth-Secret", Secret);
+        rb.putHeader("API-Parser-Version", API_PARSER_VERSION);
 
         return rb;
     }
@@ -420,7 +498,11 @@ public class MCSCore {
     }
 
     public MCSPlayer getPlayer(UUID uuid) throws IOException, InterruptedException, ExecutionException {
-        if (players.containsKey(uuid))
+        return getPlayer(uuid, false);
+    }
+
+    public MCSPlayer getPlayer(UUID uuid, boolean force) throws IOException, InterruptedException, ExecutionException {
+        if (players.containsKey(uuid) && !force)
             return new MCSPlayer(players.get(uuid));
 
         return getPlayer(uuid.toString());
@@ -429,8 +511,8 @@ public class MCSCore {
         if (name2UUID.containsKey(player) && players.containsKey(name2UUID.get(player)))
             return new MCSPlayer(players.get(name2UUID.get(player)));
 
-        RequestBuilder rb = new RequestBuilder(API_SERVER + GUID + "/player/" + player + "/details");
-        rb.putHeader("Auth-Secret", Secret);
+        RequestBuilder rb = getAuthedRequest("/player/" + player + "/details");
+
         return getPlayer(rb.post());
     }
     private MCSPlayer getPlayer(RequestResponse rs) throws IOException {
@@ -697,19 +779,6 @@ public class MCSCore {
             token.append(CHARS.charAt(random.nextInt(CHARS.length())));
         }
         return token.toString();
-    }
-
-    public String getUrl(URLType type) {
-        if (!urls.containsKey(type))
-            return null;
-
-        return urls.get(type);
-    }
-    public enum URLType {
-        REGISTER,
-        LOGIN,
-        SERVER_ADD,
-        SERVER_PANEL;
     }
 
     private enum TaskState {

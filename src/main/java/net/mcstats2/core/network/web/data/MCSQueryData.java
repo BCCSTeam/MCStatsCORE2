@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.ChatColor;
 
+import java.util.HashMap;
 import java.util.UUID;
 
 public class MCSQueryData {
@@ -15,15 +16,10 @@ public class MCSQueryData {
         public String instanceID;
         public boolean isMaster;
         public boolean hasAdminPanel;
-        public URL[] URLs;
+        public HashMap<MCSAuthData.Response.URL, String> URLs;
         public Task[] tasks;
         public Alert[] alerts;
         public Moderators[] moderators;
-
-        public class URL {
-            public MCSCore.URLType type;
-            public String url;
-        }
 
         public class Task {
             public String id;
@@ -59,6 +55,7 @@ public class MCSQueryData {
     }
 
     public enum TaskType {
+        @SerializedName("RELOAD_PLAYER_PROFILE") RELOAD_PLAYER_PROFILE,
         @SerializedName("CREATE_MUTE_REASON") CREATE_MUTE_REASON,
         @SerializedName("CREATE_BAN_REASON") CREATE_BAN_REASON,
         @SerializedName("MUTE") MUTE,

@@ -2,6 +2,7 @@ package net.mcstats2.core.api.MCSServer;
 
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 
@@ -10,6 +11,9 @@ public interface MCSServer {
     PluginDescription getDescription();
 
     ServerDetails getServerDetails();
+
+    void shutdown(String message);
+    void shutdown();
 
     MCSPlayer[] getPlayers() throws InterruptedException, ExecutionException, IOException;
 
@@ -26,6 +30,8 @@ public interface MCSServer {
     void sendConsole(String message);
 
     interface PluginDescription {
+        File getPlugin();
+
         String getName();
 
         String getAuthor();
@@ -34,6 +40,9 @@ public interface MCSServer {
     }
 
     interface ServerDetails {
+        boolean isCloudSystem();
+        CloudDetails getCloudSystem();
+
         int getPort();
 
         boolean isOnlineMode();
@@ -45,6 +54,23 @@ public interface MCSServer {
         enum ServerType {
             BUKKIT,
             BUNGEE;
+        }
+    }
+
+    interface CloudDetails {
+        String getWrapperId();
+
+        String getId();
+
+        String getGroup();
+
+        boolean isStatic();
+
+        CloudType getType();
+
+        enum CloudType {
+            CLOUDNET,
+            TIMOCLOUD
         }
     }
 }

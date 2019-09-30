@@ -1,7 +1,10 @@
 package net.mcstats2.core.api.MCSServer;
 
+import cloud.timo.TimoCloud.api.TimoCloudAPI;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import de.dytanic.cloudnet.api.CloudAPI;
+import de.dytanic.cloudnet.lib.server.ServerGroupMode;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.ChatColor;
 import net.mcstats2.core.api.MCSEntity.MCSConsole;
@@ -16,9 +19,11 @@ import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 
+import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -167,6 +172,11 @@ public class MCSBukkitServer implements MCSServer, Listener {
     public PluginDescription getDescription() {
         return new PluginDescription() {
             @Override
+            public File getPlugin() {
+                return plugin.getServer().getUpdateFolderFile();
+            }
+
+            @Override
             public String getName() {
                 return plugin.getDescription().getName();
             }
@@ -194,6 +204,86 @@ public class MCSBukkitServer implements MCSServer, Listener {
     @Override
     public ServerDetails getServerDetails() {
         return new ServerDetails() {
+
+            @Override
+            public boolean isCloudSystem() {
+                if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                    return true;
+
+                if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                    return true;
+
+                return false;
+            }
+
+            @Override
+            public CloudDetails getCloudSystem() {
+                if (!isCloudSystem())
+                    return null;
+
+                return new CloudDetails() {
+                    @Override
+                    public String getId() {
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                            return String.valueOf(CloudAPI.getInstance().getServiceId().getId());
+
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBukkitAPI().getThisServer().getId();
+
+                        return plugin.getServer().getServerId();
+                    }
+
+                    @Override
+                    public String getWrapperId() {
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                            return CloudAPI.getInstance().getServiceId().getWrapperId();
+
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBukkitAPI().getThisServer().getBase();
+
+                        return null;
+                    }
+
+                    @Override
+                    public String getGroup() {
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                            return CloudAPI.getInstance().getGroup();
+
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBukkitAPI().getThisServer().getName();
+
+                        if (plugin.getServer().getServerName().isEmpty())
+                            return plugin.getServer().getName();
+
+                        return plugin.getServer().getServerName();
+                    }
+
+                    @Override
+                    public boolean isStatic() {
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI")) {
+                            ServerGroupMode a = CloudAPI.getInstance().getServerGroup(CloudAPI.getInstance().getGroup()).getGroupMode();
+                            return a.equals(ServerGroupMode.STATIC) || a.equals(ServerGroupMode.STATIC_LOBBY);
+                        }
+
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                            return TimoCloudAPI.getBukkitAPI().getThisServer().getGroup().isStatic();
+
+                        return true;
+                    }
+
+                    @Override
+                    public CloudType getType() {
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                            return CloudType.CLOUDNET;
+
+                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                            return CloudType.TIMOCLOUD;
+
+                        return null;
+                    }
+                };
+            }
+
             @Override
             public int getPort() {
                 return plugin.getServer().getPort();
@@ -214,6 +304,22 @@ public class MCSBukkitServer implements MCSServer, Listener {
                 return plugin.getServer().getVersion();
             }
         };
+    }
+
+    @Override
+    public void shutdown(String message) {
+        try {
+            Arrays.stream(getPlayers()).forEach(p -> p.disconnect(message));
+        } catch (InterruptedException | ExecutionException | IOException e) {
+            e.printStackTrace();
+        }
+
+        shutdown();
+    }
+
+    @Override
+    public void shutdown() {
+        plugin.getServer().shutdown();
     }
 
     @Override
