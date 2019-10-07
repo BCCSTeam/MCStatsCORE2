@@ -44,6 +44,11 @@ public class Ban extends Command {
                 return;
             }
 
+            if (p.equals(tp)) {
+                p.sendMessage(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.self")));
+                return;
+            }
+
             int tm = tp.getMax("MCStatsNET.ban.power");
 
             if (m != -1)

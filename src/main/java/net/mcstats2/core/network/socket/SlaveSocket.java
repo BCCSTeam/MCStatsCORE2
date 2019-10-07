@@ -2,14 +2,11 @@ package net.mcstats2.core.network.socket;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.Client;
-import com.esotericsoftware.kryonet.Listener;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.network.socket.listeners.SlaveListener;
 import net.mcstats2.core.network.socket.packets.player.*;
-import net.mcstats2.core.network.socket.packets.server.ServerAuthPacket;
 import net.mcstats2.core.network.socket.packets.server.ServerConnectPacket;
 import net.mcstats2.core.network.socket.packets.server.ServerDisconnectPacket;
-import net.mcstats2.core.network.socket.packets.server.ServerRegisterPacket;
 
 import java.io.IOException;
 
@@ -39,9 +36,7 @@ public class SlaveSocket {
         k.register(PlayerMutePacket.class);
         k.register(PlayerQuitPacket.class);
 
-        k.register(ServerAuthPacket.class);
         k.register(ServerConnectPacket.class);
         k.register(ServerDisconnectPacket.class);
-        k.register(ServerRegisterPacket.class);
     }
 }

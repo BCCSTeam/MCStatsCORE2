@@ -103,6 +103,7 @@ public class Core extends JavaPlugin {
             }
         }
 
+        getCommand("mcstats").setExecutor(new CommandManager());
 
         if (config.getBoolean("Modules.Kick.enabled"))
             getCommand("kick").setExecutor(new CommandManager());

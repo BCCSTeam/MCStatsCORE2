@@ -33,9 +33,7 @@ public class MasterSocket {
         k.register(PlayerMutePacket.class);
         k.register(PlayerQuitPacket.class);
 
-        k.register(ServerAuthPacket.class);
         k.register(ServerConnectPacket.class);
         k.register(ServerDisconnectPacket.class);
-        k.register(ServerRegisterPacket.class);
     }
 }

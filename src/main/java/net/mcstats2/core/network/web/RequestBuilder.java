@@ -238,13 +238,11 @@ public class RequestBuilder implements Cloneable {
         return (RequestBuilder) super.clone();
     }
 
-
-
-    static class FileDownloadResponseHandler implements ResponseHandler<File> {
+    private static class FileDownloadResponseHandler implements ResponseHandler<File> {
 
         private File target;
 
-        public FileDownloadResponseHandler(File target) {
+        private FileDownloadResponseHandler(File target) {
             this.target = target;
         }
 

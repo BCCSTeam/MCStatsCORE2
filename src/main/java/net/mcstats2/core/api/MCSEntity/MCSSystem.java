@@ -1,6 +1,7 @@
 package net.mcstats2.core.api.MCSEntity;
 
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.config.Configuration;
 
 import java.util.UUID;
 
@@ -18,6 +19,11 @@ public class MCSSystem implements MCSEntity {
     @Override
     public boolean hasPermission(String perm) {
         return true;
+    }
+
+    @Override
+    public Configuration getLang() {
+        return MCSCore.getInstance().getLang("default");
     }
 
     @Override

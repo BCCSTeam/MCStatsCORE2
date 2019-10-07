@@ -102,6 +102,7 @@ public class MCSPlayerData {
             public String key;
             public Object value;
             public int expires;
+            public String timestamp;
         }
     }
 

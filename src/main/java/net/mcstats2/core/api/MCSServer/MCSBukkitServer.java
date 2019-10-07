@@ -349,13 +349,13 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
     @Override
     public void disconnect(MCSPlayer player, String reason) {
-        if (plugin.getServer().getPlayer(player.getUUID()).isOnline())
-            plugin.getServer().getPlayer(player.getUUID()).kickPlayer(reason);
+        if (isOnline(player))
+            plugin.getServer().getScheduler().runTask(plugin, () -> plugin.getServer().getPlayer(player.getUUID()).kickPlayer(reason));
     }
 
     @Override
     public void sendMessage(MCSPlayer player, String message) {
-        if (plugin.getServer().getPlayer(player.getUUID()).isOnline())
+        if (isOnline(player))
             plugin.getServer().getPlayer(player.getUUID()).sendMessage(message);
     }
 

@@ -37,7 +37,7 @@ public class Kick extends Command {
             }
 
             if (p instanceof MCSPlayer) {
-                if (((MCSPlayer)p).getUUID().equals(tp.getUUID())) {
+                if (p.equals(tp)) {
                     p.sendMessage((ChatColor.translateAlternateColorCodes('&', lang.getString("kick.prefix") + lang.getString("kick.self"))));
                     return;
                 }

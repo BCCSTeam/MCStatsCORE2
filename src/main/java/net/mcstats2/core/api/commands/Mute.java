@@ -45,6 +45,11 @@ public class Mute extends Command {
                 return;
             }
 
+            if (p.equals(tp)) {
+                p.sendMessage(ChatColor.translateAlternateColorCodes('&', lang.getString("ban.self")));
+                return;
+            }
+
             int tm = tp.getMax("MCStatsNET.mute.power");
 
             if (m != -1)

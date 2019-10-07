@@ -3,6 +3,9 @@ package net.mcstats2.core.network.web.data;
 import com.google.gson.annotations.SerializedName;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.ChatColor;
+import net.mcstats2.core.network.web.data.task.MCSTask;
+import net.mcstats2.core.network.web.data.task.MCSTaskData;
+import net.mcstats2.core.network.web.data.task.MCSTaskType;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -17,25 +20,9 @@ public class MCSQueryData {
         public boolean isMaster;
         public boolean hasAdminPanel;
         public HashMap<MCSAuthData.Response.URL, String> URLs;
-        public Task[] tasks;
+        public MCSTaskData[] tasks;
         public Alert[] alerts;
         public Moderators[] moderators;
-
-        public class Task {
-            public String id;
-            public TaskType type;
-            public UUID UUID;
-            public String STAFF;
-            public Reason reason;
-            public String[] proofs;
-            public int expire;
-
-            public class Reason {
-                public String id;
-                public String name;
-                public String text;
-            }
-        }
 
         public class Alert {
             public AlertType type;
@@ -52,16 +39,6 @@ public class MCSQueryData {
     public class System {
         public int status;
         public String message;
-    }
-
-    public enum TaskType {
-        @SerializedName("RELOAD_PLAYER_PROFILE") RELOAD_PLAYER_PROFILE,
-        @SerializedName("CREATE_MUTE_REASON") CREATE_MUTE_REASON,
-        @SerializedName("CREATE_BAN_REASON") CREATE_BAN_REASON,
-        @SerializedName("MUTE") MUTE,
-        @SerializedName("BAN") BAN,
-        @SerializedName("GMUTE") GMute,
-        @SerializedName("GBAN") GBan
     }
 
     public enum AlertType {

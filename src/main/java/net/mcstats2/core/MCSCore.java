@@ -2,14 +2,13 @@ package net.mcstats2.core;
 
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import net.mcstats2.core.api.ChatColor;
 import net.mcstats2.core.api.Command;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
-import net.mcstats2.core.api.MCSEntity.MCSSystem;
+import net.mcstats2.core.api.MCSEvent.MCSEvent;
+import net.mcstats2.core.api.MCSEvent.MCSEventType;
+import net.mcstats2.core.api.MCSEvent.player.MCSEventPlayerUpdate;
 import net.mcstats2.core.api.MCSServer.MCSBungeeServer;
 import net.mcstats2.core.api.MCSServer.MCSServer;
 import net.mcstats2.core.network.mysql.MySQL;
@@ -27,6 +26,9 @@ import net.mcstats2.core.api.config.Configuration;
 import net.mcstats2.core.api.config.ConfigurationProvider;
 import net.mcstats2.core.api.config.YamlConfiguration;
 import net.mcstats2.core.network.web.data.MCSUpdaterData;
+import net.mcstats2.core.network.web.data.task.MCSTaskData;
+import net.mcstats2.core.network.web.data.task.MCSTaskType;
+import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerUpdate;
 import net.mcstats2.core.utils.version.Version;
 
 import java.io.*;
@@ -34,6 +36,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,7 +46,8 @@ public class MCSCore {
     private MySQL mysql;
 
     private String API_SERVER = "https://api.mcstats.net/v2/server/";
-    private Version API_PARSER_VERSION;
+    public Version API_PARSER_VERSION;
+    public MCSUpdaterData UPDATE = null;
 
     private String GUID;
     private String Secret;
@@ -62,6 +66,8 @@ public class MCSCore {
 
     private static final Pattern argsSplit = Pattern.compile(" ");
     private final Map<String, Command> commandMap = new HashMap<>();
+
+    private final Map<MCSEventType, List<Consumer<MCSEvent>>> eventMap = new HashMap<>();
 
     private File pluginDir;
     private Configuration lang = null;
@@ -334,16 +340,21 @@ public class MCSCore {
                         server.sendConsole("");
                     }
 
-                    for (MCSQueryData.Response.Task task : data.response.tasks) {
-                        if (running.contains(task.id))
-                            continue;
+                    for (MCSTaskData task : data.response.tasks) {
+                        try {
+                            if (running.contains(task.getId()))
+                                continue;
 
-                        running.add(task.id);
+                            running.add(task.getId());
 
-                        if (task.type.equals(MCSQueryData.TaskType.RELOAD_PLAYER_PROFILE)) {
-                            getPlayer(task.UUID, true);
-                            updateTaskState(task, TaskState.DONE);
-                        } else if (task.type != MCSQueryData.TaskType.CREATE_MUTE_REASON && task.type != MCSQueryData.TaskType.CREATE_BAN_REASON) {
+                            if (task.getType().equals(MCSTaskType.RELOAD_PLAYER_PROFILE)) {
+                                MCSTaskPlayerUpdate job = (MCSTaskPlayerUpdate) task.getTask();
+                                getPlayer(job.getUUID(), true);
+                                updateTaskState(task, TaskState.DONE);
+                            } else if (task.getType() != MCSTaskType.CREATE_MUTE_REASON) {
+
+                            } else if (task.getType() != MCSTaskType.CREATE_BAN_REASON) {
+                            /*
                             MCSPlayer target = getPlayer(task.UUID);
 
                             MCSEntity staff = null;
@@ -353,7 +364,7 @@ public class MCSCore {
                                 staff = new MCSSystem();
 
                             try {
-                                switch (task.type) {
+                                switch (task.getType()) {
                                     case MUTE:
                                         if (task.reason.text.isEmpty())
                                             target.createMute(staff, getMuteTemplateByID(task.reason.id));
@@ -372,11 +383,11 @@ public class MCSCore {
                                         break;
                                 }
 
-                                updateTaskState(task, TaskState.DONE);
-                            } catch (IOException | InterruptedException | ExecutionException | SQLException e) {
-                                updateTaskState(task, TaskState.FAILED);
-                                e.printStackTrace();
+                                updateTaskState(task, TaskState.DONE);*/
                             }
+                        } catch (Exception e) {
+                            updateTaskState(task, TaskState.FAILED);
+                            e.printStackTrace();
                         }
                     }
 
@@ -397,64 +408,97 @@ public class MCSCore {
         t.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                try {
-                    server.sendConsole("§7Checking for Update...");
-
-                    RequestBuilder rb = getAuthedRequest("updater");
-                    RequestResponse rr = rb.post();
-                    if (rr.getStatusCode() != 200)
-                        throw new MCSError(rr.getStatusLine().getReasonPhrase());
-
-                    MCSUpdaterData data = new Gson().fromJson(rr.getContent(), MCSUpdaterData.class);
-
-                    if (data.getSystem().getStatus() != 200)
-                        throw new MCSError(data.getSystem().getMessage());
-
-                    if (!API_PARSER_VERSION.isEqual(data.getResponse().getVersion())) {
-                        if (API_PARSER_VERSION.isHigherThan(data.getResponse().getVersion()))
-                            throw new MCSError("Version error! Please check manual for Updates, in cause if this error stay please contact support at support@mcstats.net and wait for future instructions!");
-
-                        runUpdate(data);
-                    } else
-                        server.sendConsole("§aRunning newest version(" + data.getResponse().getVersion() + ")!");
-                } catch (IOException | InterruptedException | ExecutionException | MCSError e) {
-                    e.printStackTrace();
-                }
+                checkUpdate(true);
             }
         }, 0, 1000 * 60 * 5);
 
         registerCommands();
     }
 
-    public void end() {
-        t.cancel();
+    public Timer getTimer() {
+        return t;
     }
 
-    private void runUpdate(MCSUpdaterData data) throws MCSError, IOException, ExecutionException, InterruptedException {
-        server.sendConsole("§6An new version(" + data.getResponse().getVersion() + ") is available! Downloading...");
+    public void end() {
+        if (t != null) {
+            t.purge();
+            t.cancel();
+            t = null;
+        }
+    }
+
+    public void reload() {
+        try {
+            langs.keySet().forEach(a -> langs.put(a, getLang(a)));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void checkUpdate(boolean autoupdate) {
+        try {
+            server.sendConsole("§7Checking for Update...");
+
+            RequestBuilder rb = getAuthedRequest("updater");
+            RequestResponse rr = rb.post();
+            if (rr.getStatusCode() != 200)
+                throw new MCSError(rr.getStatusLine().getReasonPhrase());
+
+            MCSUpdaterData data = new Gson().fromJson(rr.getContent(), MCSUpdaterData.class);
+
+            if (data.getSystem().getStatus() != 200) {
+                UPDATE = null;
+                throw new MCSError(data.getSystem().getMessage());
+            }
+
+            UPDATE = data;
+
+            if (!API_PARSER_VERSION.isEqual(data.getResponse().getVersion())) {
+                if (API_PARSER_VERSION.isHigherThan(data.getResponse().getVersion()))
+                    throw new MCSError("Version error! Please check manual for Updates, in cause if this error stay please contact support at support@mcstats.net and wait for future instructions!");
+
+                runUpdate(data, true, true);
+            } else
+                server.sendConsole("§aRunning newest version(" + data.getResponse().getVersion() + ")!");
+        } catch (IOException | InterruptedException | ExecutionException | MCSError e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void runUpdate(MCSUpdaterData data, boolean autoreplace, boolean autorestart) throws MCSError, IOException, ExecutionException, InterruptedException {
+        server.sendConsole("§6An new version(" + data.getResponse().getVersion() + ") is available for download! Downloading...");
         if (!data.getResponse().getDownloadURL().startsWith("https://mcstats.net/") && !data.getResponse().getDownloadURL().startsWith("https://www.mcstats.net/") && !data.getResponse().getDownloadURL().startsWith("https://api.mcstats.net/"))
             throw new MCSError("Unsafe download URL! Please check manual for Updates, in cause if this error stay please contact support at support@mcstats.net and wait for future instructions!");
 
-        File home = server instanceof MCSBungeeServer ? server.getDescription().getPlugin() : new File(server.getDescription().getPlugin(), "MCStatsCORE-" + server.getDescription().getVersion() + ".jar");
+        File home = server instanceof MCSBungeeServer ? server.getDescription().getPlugin() : new File(server.getDescription().getPlugin(), "MCStatsCORE2-" + server.getDescription().getVersion() + ".jar");
         File a = new File(pluginDir.getPath() + "/cache/", "MCStatsCORE2-" + data.getResponse().getVersion() + ".jar");
         RequestBuilder rb = new RequestBuilder(data.getResponse().getDownloadURL());
         rb.download(a);
 
-        server.sendConsole("§eUpdate downloaded! Moving file(MCStatsCORE2-" + data.getResponse().getVersion() + ".jar)...");
+        if (server.getServerDetails().isCloudSystem()) {
+            server.sendConsole("§eUpdate downloaded! Can't moving file(MCStatsCORE2-" + data.getResponse().getVersion() + ".jar)...");
+            return;
+        }
 
-        Files.move(a, home);
+        if (autoreplace) {
+            server.sendConsole("§eUpdate downloaded! Moving file(MCStatsCORE2-" + data.getResponse().getVersion() + ".jar)...");
 
-        server.sendConsole("§aUpdate moved! Stopping server...");
+            Files.move(a, home);
+        }
 
-        server.shutdown();
+        if (autorestart) {
+            server.sendConsole("§aUpdate moved! Stopping server...");
+
+            server.shutdown();
+        }
     }
 
-    private void updateTaskState(MCSQueryData.Response.Task task, TaskState state) throws InterruptedException, ExecutionException, IOException {
-        RequestBuilder rb = getAuthedRequest("task/" + task.id + "/update");
-        rb.putParam("state", state.name().toLowerCase());
+    private void updateTaskState(MCSTaskData task, TaskState state) throws InterruptedException, ExecutionException, IOException {
+        RequestBuilder rb = getAuthedRequest("task/" + task.getId() + "/update");
+        rb.putParam("status", state.getCode());
         rb.post();
 
-        running.remove(task.id);
+        running.remove(task.getId());
     }
 
     private MCSQueryData pharseQuery(RequestResponse rs) throws IOException {
@@ -473,7 +517,7 @@ public class MCSCore {
         RequestBuilder rb = new RequestBuilder(API_SERVER + GUID + (path.startsWith("/") ? "" : "/") + path);
         rb.putHeader("Auth-Instance", instanceID);
         rb.putHeader("Auth-Secret", Secret);
-        rb.putHeader("API-Parser-Version", API_PARSER_VERSION);
+        rb.putHeader("API-Parser-Version", API_PARSER_VERSION.getOriginalString());
 
         return rb;
     }
@@ -505,7 +549,12 @@ public class MCSCore {
         if (players.containsKey(uuid) && !force)
             return new MCSPlayer(players.get(uuid));
 
-        return getPlayer(uuid.toString());
+        MCSPlayer player = getPlayer(uuid.toString());
+
+        if (force)
+            executeEvent(MCSEventType.PLAYER_UPDATE, player);
+
+        return player;
     }
     public MCSPlayer getPlayer(String player) throws IOException, InterruptedException, ExecutionException {
         if (name2UUID.containsKey(player) && players.containsKey(name2UUID.get(player)))
@@ -530,7 +579,21 @@ public class MCSCore {
         return new MCSPlayer(data);
     }
 
+    public void registerEvent(MCSEventType type, Consumer<MCSEvent> consumer) {
+        List<Consumer<MCSEvent>> events = eventMap.getOrDefault(type, new ArrayList<>());
+        events.add(consumer);
+        eventMap.put(type, events);
+    }
+    public void executeEvent(MCSEventType type, Object... data) {
+        if (!eventMap.containsKey(type))
+            return;
+
+        eventMap.get(type).forEach(a -> a.accept(new MCSEventPlayerUpdate((MCSPlayer) data[0])));
+    }
+
     private void registerCommands() {
+        registerCommand(new MCStats("mcstats"));
+
         if (getServer().getClass().getName().startsWith("MCSBungeeServer"))
             registerCommand(new Jump("jump"));
 
@@ -569,7 +632,6 @@ public class MCSCore {
         }
     }
 
-
     public boolean dispatchCommand(MCSEntity sender, String name, String[] args) {
         Command command = commandMap.get(name);
         if (command == null) {
@@ -593,8 +655,15 @@ public class MCSCore {
         }
     }
 
-    public MuteTemplate creaeteMuteTemplate() {
-        return null;
+
+    public MuteTemplate createMuteTemplate(String name, String reason, int power, List<Integer> expires_) throws SQLException {
+        String id = randomString(10);
+        String expires = new Gson().toJson(expires_);
+
+        if (getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes-templates`(`id`, `name`, `text`, `power`, `expires`) VALUES (?,?,?,?,?)", id, name, reason, power, expires) != 0)
+            return getMuteTemplateByID(id);
+        else
+            return null;
     }
 
     public MuteTemplate getMuteTemplateByID(String id) throws SQLException {
@@ -685,8 +754,18 @@ public class MCSCore {
     }
 
 
+    public BanTemplate createBanTemplate(String name, String reason, int power, List<Integer> expires_) throws SQLException {
+        String id = randomString(10);
+        String expires = new Gson().toJson(expires_);
+
+        if (getMySQL().queryUpdate("INSERT INTO `MCSCore__bans-templates`(`id`, `name`, `text`, `power`, `expires`) VALUES (?,?,?,?,?)", id, name, reason, power, expires) != 0)
+            return getBanTemplateByID(id);
+        else
+            return null;
+    }
+
     public BanTemplate getBanTemplateByID(String id) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `id`=? LIMIT 1", id);
+        ResultSet rs = mysql.query("SELECT * FROM getMCSCore__bans-templates` WHERE `id`=? LIMIT 1", id);
         if (!rs.next())
             return null;
         return new BanTemplate(rs);
@@ -782,8 +861,18 @@ public class MCSCore {
     }
 
     private enum TaskState {
-        DONE,
-        FAILED;
+        DONE(1),
+        FAILED(-1);
+
+        int code;
+
+        TaskState(int code) {
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
     }
 
 

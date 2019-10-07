@@ -1,9 +1,12 @@
 package net.mcstats2.core.api.MCSEntity;
 
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.MCSEvent.MCSEventType;
 import net.mcstats2.core.api.config.Configuration;
+import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.network.web.data.MCSPlayerData;
 import net.mcstats2.core.network.web.RequestBuilder;
+import net.mcstats2.core.utils.StringUtils;
 
 import java.io.IOException;
 import java.sql.ResultSet;
@@ -105,6 +108,12 @@ public class MCSPlayer implements MCSEntity {
     public boolean hasPermission(String s) {
         return MCSCore.getInstance().getServer().hasPermission(this, s);
     }
+
+    @Override
+    public Configuration getLang() {
+        return MCSCore.getInstance().getLang(getLanguage());
+    }
+
     public int getMax(String path) {
         int limit = 255;
 
@@ -157,7 +166,7 @@ public class MCSPlayer implements MCSEntity {
             replace.put("end_seconds", end_timestamp.getSeconds());
         }
 
-        disconnect(MCSCore.getInstance().buildScreen(MCSCore.getInstance().getLang(getSession().getAddressDetails().getLanguage()), ban.getExpire() != 0 ? "ban.perm.screen" : "ban.temp.screen", replace)); 
+        disconnect(MCSCore.getInstance().buildScreen(getLang(), ban.getExpire() != 0 ? "ban.temp.screen" : "ban.perm.screen", replace));
     }
 
     public Warn createWarn(MCSEntity staff, String type, String expire) throws SQLException {
@@ -736,6 +745,19 @@ public class MCSPlayer implements MCSEntity {
 
         CData(MCSPlayerData.Response.CData cdata) {
             this.cdata = cdata;
+
+            if (getExpires() != 0)
+                MCSCore.getInstance().getTimer().schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        try {
+                            MCSCore.getInstance().getPlayer(getUUID(), true);
+                        } catch (IOException | InterruptedException | ExecutionException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }, StringUtils.timestampAddSeconds(StringUtils.string2Timestamp(getTimestamp()), getExpires()));
+
         }
 
         public String getID() {
@@ -756,6 +778,10 @@ public class MCSPlayer implements MCSEntity {
 
         public int getExpires() {
             return cdata.expires;
+        }
+
+        public String getTimestamp() {
+            return cdata.timestamp;
         }
 
         public boolean setValue(Object newValue) throws InterruptedException, ExecutionException, IOException {

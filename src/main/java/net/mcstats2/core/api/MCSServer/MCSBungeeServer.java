@@ -203,13 +203,13 @@ public class MCSBungeeServer implements MCSServer, Listener {
 
     @Override
     public void disconnect(MCSPlayer player, String reason) {
-        if (plugin.getProxy().getPlayer(player.getUUID()).isConnected())
+        if (isOnline(player))
             plugin.getProxy().getPlayer(player.getUUID()).disconnect(TextComponent.fromLegacyText(reason));
     }
 
     @Override
     public void sendMessage(MCSPlayer player, String message) {
-        if (plugin.getProxy().getPlayer(player.getUUID()).isConnected())
+        if (isOnline(player))
             plugin.getProxy().getPlayer(player.getUUID()).sendMessage(TextComponent.fromLegacyText(message));
     }
 
