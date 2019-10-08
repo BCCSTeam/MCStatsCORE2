@@ -28,6 +28,7 @@ import net.mcstats2.core.api.config.YamlConfiguration;
 import net.mcstats2.core.network.web.data.MCSUpdaterData;
 import net.mcstats2.core.network.web.data.task.MCSTaskData;
 import net.mcstats2.core.network.web.data.task.MCSTaskType;
+import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerSendMessage;
 import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerUpdate;
 import net.mcstats2.core.utils.version.Version;
 
@@ -347,14 +348,20 @@ public class MCSCore {
 
                             running.add(task.getId());
 
-                            if (task.getType().equals(MCSTaskType.RELOAD_PLAYER_PROFILE)) {
+                            if (task.getType().equals(MCSTaskType.PLAYER_UPDATE)) {
                                 MCSTaskPlayerUpdate job = (MCSTaskPlayerUpdate) task.getTask();
                                 getPlayer(job.getUUID(), true);
                                 updateTaskState(task, TaskState.DONE);
-                            } else if (task.getType() != MCSTaskType.CREATE_MUTE_REASON) {
+                            } if (task.getType().equals(MCSTaskType.PLAYER_MESSAGE)) {
+                                MCSTaskPlayerSendMessage job = (MCSTaskPlayerSendMessage) task.getTask();
+                                MCSPlayer p = getPlayer(job.getReceiver());
+                                if (p.isOnline())
+                                    p.sendMessage(job.getMessage());
+                                updateTaskState(task, TaskState.DONE);
+                            /*
+                            } else if (task.getType() != MCSTaskType.SER) {
 
                             } else if (task.getType() != MCSTaskType.CREATE_BAN_REASON) {
-                            /*
                             MCSPlayer target = getPlayer(task.UUID);
 
                             MCSEntity staff = null;
@@ -384,7 +391,8 @@ public class MCSCore {
                                 }
 
                                 updateTaskState(task, TaskState.DONE);*/
-                            }
+                            } else
+                                updateTaskState(task, TaskState.UNSUPPORTED);
                         } catch (Exception e) {
                             updateTaskState(task, TaskState.FAILED);
                             e.printStackTrace();
@@ -862,7 +870,8 @@ public class MCSCore {
 
     private enum TaskState {
         DONE(1),
-        FAILED(-1);
+        FAILED(-1),
+        UNSUPPORTED(-2);
 
         int code;
 
