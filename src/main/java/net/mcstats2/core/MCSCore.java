@@ -28,7 +28,7 @@ import net.mcstats2.core.api.config.YamlConfiguration;
 import net.mcstats2.core.network.web.data.MCSUpdaterData;
 import net.mcstats2.core.network.web.data.task.MCSTaskData;
 import net.mcstats2.core.network.web.data.task.MCSTaskType;
-import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerSendMessage;
+import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerMessage;
 import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerUpdate;
 import net.mcstats2.core.utils.version.Version;
 
@@ -353,7 +353,7 @@ public class MCSCore {
                                 getPlayer(job.getUUID(), true);
                                 updateTaskState(task, TaskState.DONE);
                             } if (task.getType().equals(MCSTaskType.PLAYER_MESSAGE)) {
-                                MCSTaskPlayerSendMessage job = (MCSTaskPlayerSendMessage) task.getTask();
+                                MCSTaskPlayerMessage job = (MCSTaskPlayerMessage) task.getTask();
                                 MCSPlayer p = getPlayer(job.getReceiver());
                                 if (p.isOnline())
                                     p.sendMessage(job.getMessage());

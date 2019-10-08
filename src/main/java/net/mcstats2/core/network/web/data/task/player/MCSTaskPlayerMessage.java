@@ -5,7 +5,7 @@ import net.mcstats2.core.network.web.data.task.MCSTask;
 
 import java.util.UUID;
 
-public class MCSTaskPlayerSendMessage implements MCSTask {
+public class MCSTaskPlayerMessage implements MCSTask {
     private UUID receiver;
     private String message;
     private boolean colored;

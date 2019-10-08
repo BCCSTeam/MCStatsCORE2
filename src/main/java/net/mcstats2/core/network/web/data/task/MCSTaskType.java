@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName;
 
 public enum MCSTaskType {
     @SerializedName("PLAYER_UPDATE") PLAYER_UPDATE("net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerUpdate"),
-    @SerializedName("PLAYER_MESSAGE") PLAYER_MESSAGE("net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerSendMessage"),
+    @SerializedName("PLAYER_MESSAGE") PLAYER_MESSAGE("net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerMessage"),
     @SerializedName("PLAYER_MUTE") PLAYER_MUTE(null),
     @SerializedName("PLAYER_BAN") PLAYER_BAN(null),
     @SerializedName("PLAYER_GMUTE") PLAYER_GMute(null),
