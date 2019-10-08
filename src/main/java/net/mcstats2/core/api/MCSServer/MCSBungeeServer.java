@@ -186,6 +186,11 @@ public class MCSBungeeServer implements MCSServer, Listener {
     }
 
     @Override
+    public void broadcast(String message) {
+        plugin.getProxy().broadcast(TextComponent.fromLegacyText(message));
+    }
+
+    @Override
     public void broadcast(String perm, String message) {
         for (ProxiedPlayer pp : plugin.getProxy().getPlayers()) {
             if (pp.hasPermission(perm))

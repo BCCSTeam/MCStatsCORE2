@@ -28,8 +28,9 @@ import net.mcstats2.core.api.config.YamlConfiguration;
 import net.mcstats2.core.network.web.data.MCSUpdaterData;
 import net.mcstats2.core.network.web.data.task.MCSTaskData;
 import net.mcstats2.core.network.web.data.task.MCSTaskType;
-import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerMessage;
-import net.mcstats2.core.network.web.data.task.player.MCSTaskPlayerUpdate;
+import net.mcstats2.core.network.web.data.task.player.*;
+import net.mcstats2.core.network.web.data.task.server.MCSTaskServerBanCreateReason;
+import net.mcstats2.core.network.web.data.task.server.MCSTaskServerMuteCreateReason;
 import net.mcstats2.core.utils.version.Version;
 
 import java.io.*;
@@ -62,7 +63,7 @@ public class MCSCore {
     private long cooldown = 0;
     private HashMap<MCSAuthData.Response.URL, String> urls = new HashMap<>();
 
-    private ArrayList<String> running = new ArrayList<>();
+    private HashMap<MCSTaskData, Long> running = new HashMap<>();
     private HashMap<Integer, Long> cooldowns = new HashMap<>();
 
     private static final Pattern argsSplit = Pattern.compile(" ");
@@ -341,56 +342,143 @@ public class MCSCore {
                         server.sendConsole("");
                     }
 
+                    ArrayList<String> failed = new ArrayList<>();
+                    running.forEach((a, b) -> {
+                        if (b <= System.currentTimeMillis() + 1000*60*5) {
+                            try {
+                                failed.add(a.getId());
+                                updateTaskState(a, TaskState.TIMEOUT);
+                            } catch (InterruptedException | ExecutionException | IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+
                     for (MCSTaskData task : data.response.tasks) {
                         try {
-                            if (running.contains(task.getId()))
+                            if (failed.contains(task.getId()))
                                 continue;
 
-                            running.add(task.getId());
+                            if (running.containsKey(task))
+                                continue;
+
+                            running.put(task, System.currentTimeMillis());
 
                             if (task.getType().equals(MCSTaskType.PLAYER_UPDATE)) {
-                                MCSTaskPlayerUpdate job = (MCSTaskPlayerUpdate) task.getTask();
-                                getPlayer(job.getUUID(), true);
+                                MCSTaskPlayerUpdate j = (MCSTaskPlayerUpdate) task.getTask();
+
+                                getPlayer(j.getUUID(), true);
+
                                 updateTaskState(task, TaskState.DONE);
-                            } if (task.getType().equals(MCSTaskType.PLAYER_MESSAGE)) {
-                                MCSTaskPlayerMessage job = (MCSTaskPlayerMessage) task.getTask();
-                                MCSPlayer p = getPlayer(job.getReceiver());
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_MESSAGE)) {
+                                MCSTaskPlayerMessage j = (MCSTaskPlayerMessage) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getReceiver());
                                 if (p.isOnline())
-                                    p.sendMessage(job.getMessage());
+                                    p.sendMessage(j.getMessage());
+
                                 updateTaskState(task, TaskState.DONE);
-                            /*
-                            } else if (task.getType() != MCSTaskType.SER) {
 
-                            } else if (task.getType() != MCSTaskType.CREATE_BAN_REASON) {
-                            MCSPlayer target = getPlayer(task.UUID);
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_ALERT)) {
+                                MCSTaskPlayerAlert j = (MCSTaskPlayerAlert) task.getTask();
 
-                            MCSEntity staff = null;
-                            if (task.STAFF.matches("[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"))
-                                staff = getPlayer(task.STAFF);
-                            else
-                                staff = new MCSSystem();
+                                if (j.getPermission() != null)
+                                    getServer().broadcast(j.getPermission(), j.getMessage());
+                                else
+                                    getServer().broadcast(j.getMessage());
 
-                            try {
-                                switch (task.getType()) {
-                                    case MUTE:
-                                        if (task.reason.text.isEmpty())
-                                            target.createMute(staff, getMuteTemplateByID(task.reason.id));
-                                        else
-                                            target.createCustomMute(staff, task.reason.text, task.expire);
-                                        break;
-                                    case BAN:
-                                        if (task.reason.text.isEmpty())
-                                            target.createBan(staff, getBanTemplateByID(task.reason.id));
-                                        else
-                                            target.createCustomBan(staff, task.reason.text, task.expire);
-                                        break;
-                                    case GMute:
-                                        break;
-                                    case GBan:
-                                        break;
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_KICK)) {
+                                MCSTaskPlayerKick j = (MCSTaskPlayerKick) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+
+                                HashMap<String, Object> replace = new HashMap<>();
+                                replace.put("reason", j.getReason());
+                                p.disconnect(MCSCore.getInstance().buildScreen(p.getLang(), "kick.screen", replace));
+
+                                replace.put("playername", p.getName());
+                                replace.put("staffname", p.getName());
+                                try {
+                                    MCSCore.getInstance().broadcast("MCStatsNET.kick.alert", "kick.prefix", "kick.alert", replace);
+                                } catch (InterruptedException | ExecutionException | IOException e) {
+                                    e.printStackTrace();
                                 }
 
-                                updateTaskState(task, TaskState.DONE);*/
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_MUTE)) {
+                                MCSTaskPlayerMute j = (MCSTaskPlayerMute) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                MCSPlayer staff = getPlayer(j.getSTAFF());
+
+                                if (j.getTemplate() != null)
+                                    p.createMute(staff, j.getTemplate());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_BAN)) {
+                                MCSTaskPlayerBan j = (MCSTaskPlayerBan) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                MCSPlayer staff = getPlayer(j.getSTAFF());
+
+                                if (j.getTemplate() != null)
+                                    p.createBan(staff, j.getTemplate());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_CMUTE)) {
+                                MCSTaskPlayerCMute j = (MCSTaskPlayerCMute) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                MCSPlayer staff = getPlayer(j.getSTAFF());
+
+                                p.createCustomMute(staff, j.getText(), j.getExpire());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_CBAN)) {
+                                MCSTaskPlayerCBan j = (MCSTaskPlayerCBan) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                MCSPlayer staff = getPlayer(j.getSTAFF());
+
+                                p.createCustomBan(staff, j.getText(), j.getExpire());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_GMUTE) || task.getType().equals(MCSTaskType.PLAYER_GBAN)) {
+                                MCSTaskPlayerKick j = (MCSTaskPlayerKick) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                p.disconnect(j.getReason());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.SERVER_MUTE_CREATE_REASON)) {
+                                MCSTaskServerMuteCreateReason j = (MCSTaskServerMuteCreateReason) task.getTask();
+
+                                createMuteTemplate(j.getName(), j.getReason(), j.getPower(), j.getExpires());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.SERVER_BAN_CREATE_REASON)) {
+                                MCSTaskServerBanCreateReason j = (MCSTaskServerBanCreateReason) task.getTask();
+
+                                createBanTemplate(j.getName(), j.getReason(), j.getPower(), j.getExpires());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                                /*
+                            } else if (task.getType().equals(MCSTaskType.SERVER_BAN_CREATE_REASON)) {
+                                MCSTaskServerBanCreateReason j = (MCSTaskServerBanCreateReason) task.getTask();
+
+                                updateTaskState(task, TaskState.DONE);
+                                 */
                             } else
                                 updateTaskState(task, TaskState.UNSUPPORTED);
                         } catch (Exception e) {
@@ -506,7 +594,7 @@ public class MCSCore {
         rb.putParam("status", state.getCode());
         rb.post();
 
-        running.remove(task.getId());
+        running.remove(task);
     }
 
     private MCSQueryData pharseQuery(RequestResponse rs) throws IOException {
@@ -871,7 +959,8 @@ public class MCSCore {
     private enum TaskState {
         DONE(1),
         FAILED(-1),
-        UNSUPPORTED(-2);
+        UNSUPPORTED(-2),
+        TIMEOUT(-3);
 
         int code;
 

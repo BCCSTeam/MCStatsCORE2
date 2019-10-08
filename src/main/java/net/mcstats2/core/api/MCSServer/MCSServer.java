@@ -19,6 +19,8 @@ public interface MCSServer {
 
     boolean isOnline(MCSPlayer player);
 
+    void broadcast(String message);
+
     void broadcast(String perm, String message);
 
     boolean hasPermission(MCSPlayer player, String s);

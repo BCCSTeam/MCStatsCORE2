@@ -338,6 +338,11 @@ public class MCSBukkitServer implements MCSServer, Listener {
     }
 
     @Override
+    public void broadcast(String message) {
+        plugin.getServer().broadcastMessage(message);
+    }
+
+    @Override
     public void broadcast(String perm, String message) {
         plugin.getServer().broadcast(perm, message);
     }
