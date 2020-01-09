@@ -585,13 +585,6 @@ public class MCSCore {
             t = null;
         }
 
-        try {
-            RequestBuilder rb = getAuthedRequest("/shutdown");
-            rb.post();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
         shutdown.forEach(s -> {
             try {
                 s.shutdown();
@@ -599,6 +592,13 @@ public class MCSCore {
                 e.printStackTrace();
             }
         });
+
+        try {
+            RequestBuilder rb = getAuthedRequest("/shutdown");
+            rb.post();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public void addToReload(Supplier<Void> func) {
