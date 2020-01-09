@@ -1,5 +1,50 @@
 noPermissions: '&cYou are not allowed to use this command!'
-permanent: 'Never'
+
+expires:
+  never: '&cNever'
+  temporary: '&6%days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds'
+
+status:
+  active: '&cActive'
+  invalid: '&8Invalid'
+  expired: '&aExpired'
+  online: '&aOnline'
+  offline: '&cOffline'
+
+actions:
+  return: '&8[&6RETURN&8]'
+  accept: '&8[&aACCEPT&8]'
+  deny: '&8[&cDENY&8]'
+  cancel: '&8[&cCANCEL&8]'
+  delete: '&8[&4X&8]'
+  hide: '&8[&7X&8]'
+  kick: ''
+  unmute: '&8[&4X&8]'
+  mute: ''
+  mutes: ''
+  unban: '&8[&4X&8]'
+  ban: ''
+  bans: ''
+  logins: ''
+  chatlogs: ''
+
+
+playerInfo:
+  details:
+    - '&aName: &e%playername%'
+    - '&aNames: &e%playernames%'
+  list:
+    mutes:
+      text: '&7[%id%] &c%reason%&e, Status: %status%'
+      details:
+        - '&aStaff: %staffname%'
+        - '&aExpire: %expires%'
+    bans:
+      text: '&7[%id%] &c%reason%&e, Status: %status%'
+      details:
+        - '&aStaff: %staffname%'
+        - '&aExpire: %expires%'
+    logins: ''
 
 ChatFilter:
   prefix: '&e&lCHAT&r &7&l|&r &7'
@@ -22,17 +67,32 @@ checks:
     alert: '&7[%id%] &c%playername% &7tried to connect with a VPN/Proxy!'
     alertButIgnore: '&7[%id%] &c%playername% &7is using a VPN/Proxy on this Network, but he is allowed to bypass the Check.'
   SkinChecker:
-    screen:
-      - ''
-      - '&4! ! !'
-      - ''
-      - '&cPlease turn your VPN/Proxy off!'
-      - ''
-      - '&4! ! !'
-      - '&8%id%'
-      - ''
-    alert: '&7[%id%] &c%playername% &7tried to connect with a VPN/Proxy!'
-    alertButIgnore: '&7[%id%] &c%playername% &7is using a VPN/Proxy on this Network, but he is allowed to bypass the Check.'
+    auto-change:
+      screen:
+        - ''
+        - '&4! ! !'
+        - ''
+        - '&cYour Skin is forbidden on this Network!'
+        - '&ePlease change your Skin!'
+        - ''
+        - '&4! ! !'
+        - '&8%id%'
+        - ''
+      alert: '&7[%id%] &c%playername% &7tried to play with a blacklisted Skin!'
+      alertButIgnore: '&7[%id%] &c%playername% &7is playing with a blacklisted Skin on this Network, but he is allowed to bypass the Check.'
+    kick:
+      screen:
+        - ''
+        - '&4! ! !'
+        - ''
+        - '&cYour Skin is forbidden on this Network!'
+        - '&ePlease change your Skin!'
+        - ''
+        - '&4! ! !'
+        - '&8%id%'
+        - ''
+      alert: '&7[%id%] &c%playername% &7tried to play with a blacklisted Skin!'
+      alertButIgnore: '&7[%id%] &c%playername% &7is playing with a blacklisted Skin on this Network, but he is allowed to bypass the Check.'
   AccountLimiter:
     screen:
       - ''
@@ -71,30 +131,17 @@ mute:
   alreadyBlocked: '&c%playername% is allready blocked!'
   bypass: '&c%playername% &7ignores Mutes from the server!'
   self: '&cPlease do not Mute yourself!'
-  temp:
-    screen:
-      - ''
-      - '&4You are Muted from the Chat!'
-      - ''
-      - '&7Reason: &c%reason%'
-      - '&7Expire: &6%days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds'
-      - '&7muteID: &6%id%'
-      - ''
-      - '&eUnmute appeals at http://example.com'
-      - ''
-    alert: '&7[%id%] &c%playername% &7was muted by &a%staffname%&7, for &c%reason%&7. Expire: %days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds.'
-  perm:
-    screen:
-      - ''
-      - '&4You are Muted from the Chat!'
-      - ''
-      - '&7Reason: &c%reason%'
-      - '&7Expire: &4Never'
-      - '&7muteID: &6%id%'
-      - ''
-      - '&eUnmute appeals at http://example.com'
-      - ''
-    alert: '&7[%id%] &c%playername% &7was muted by &a%staffname%&7, for &c%reason%&7. Expire: Never'
+  screen:
+    - ''
+    - '&4You are Muted from the Chat!'
+    - ''
+    - '&7Reason: &c%reason%'
+    - '&7Expire: %expires%'
+    - '&7muteID: &6%id%'
+    - ''
+    - '&eUnmute appeals at http://example.com'
+    - ''
+  alert: '&7[%id%] &c%playername% &7was muted by &a%staffname%&7, for &c%reason%&7. Expire: %expires%'
 
 
 unban:
@@ -109,27 +156,14 @@ ban:
   alreadyBlocked: '&c%playername% is allready blocked!'
   bypass: '&c%playername% &7ignores Bans from the server!'
   self: '&cPlease do not Ban yourself!'
-  temp:
-    screen:
-      - ''
-      - '&4You are Banned from this Network!'
-      - ''
-      - '&7Reason: &c%reason%'
-      - '&7Expire: &6%days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds'
-      - '&7banID: &6%id%'
-      - ''
-      - '&eUnban appeals at http://example.com'
-      - ''
-    alert: '&7[%id%] &c%playername% &7was banned by &a%staffname%&7, for &c%reason%&7. Expire: %days% Days, %hours% Hours, %minutes% Minutes, %seconds% Seconds.'
-  perm:
-    screen:
-      - ''
-      - '&4You are Banned from this Network!'
-      - ''
-      - '&7Reason: &c%reason%'
-      - '&7Expire: &4Never'
-      - '&7banID: &6%id%'
-      - ''
-      - '&eUnban appeals at http://example.com'
-      - ''
-    alert: '&7[%id%] &c%playername% &7was banned by &a%staffname%&7, for &c%reason%&7. Expire: Never'
+  screen:
+    - ''
+    - '&4You are Banned from this Network!'
+    - ''
+    - '&7Reason: &c%reason%'
+    - '&7Expire: %expires%'
+    - '&7banID: &6%id%'
+    - ''
+    - '&eUnban appeals at http://example.com'
+    - ''
+  alert: '&7[%id%] &c%playername% &7was banned by &a%staffname%&7, for &c%reason%&7. Expire: %expires%'

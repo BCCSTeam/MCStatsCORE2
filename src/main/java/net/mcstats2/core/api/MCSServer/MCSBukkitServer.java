@@ -1,40 +1,82 @@
 package net.mcstats2.core.api.MCSServer;
 
 import cloud.timo.TimoCloud.api.TimoCloudAPI;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
 import de.dytanic.cloudnet.api.CloudAPI;
 import de.dytanic.cloudnet.lib.server.ServerGroupMode;
+import net.mcstats2.bridge.server.bukkit.MCPerms;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.ChatColor;
 import net.mcstats2.core.api.MCSEntity.MCSConsole;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
+import net.mcstats2.core.api.chat.BaseComponent;
+import net.mcstats2.core.api.chat.serializer.ComponentSerializer;
 import net.mcstats2.core.api.config.Configuration;
+import net.mcstats2.core.modules.chatlog.data.ChatLogDataCommand;
+import net.mcstats2.core.modules.chatlog.data.ChatLogDataMessage;
+import net.mcstats2.core.network.web.RequestBuilder;
+import net.mcstats2.core.network.web.RequestResponse;
+import net.mcstats2.core.network.web.data.MCSPlayerData;
+import net.mcstats2.core.utils.server.bukkit.ActionBarAPI;
+import net.mcstats2.core.utils.server.bukkit.TitleAPI;
+import net.mcstats2.core.utils.server.bukkit.tinyprotocol.Reflection;
+import net.mcstats2.core.utils.server.bukkit.tinyprotocol.TinyProtocol;
+import org.bukkit.Bukkit;
+import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
+import us.myles.ViaVersion.api.Via;
 
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 public class MCSBukkitServer implements MCSServer, Listener {
     private Plugin plugin;
+    private Property replaceSkin;
+
+    private TinyProtocol protocol;
+
+    private Class<?> craftplayer = Reflection.getClass("{obc}.entity.CraftPlayer");
+    private Reflection.MethodInvoker getHandle = Reflection.getMethod(craftplayer, "getHandle");
+    private Class<?> ep = Reflection.getClass("{nms}.EntityPlayer");
+
+    Class<?> ms = Reflection.getClass("{nms}.MinecraftServer");
+    Reflection.FieldAccessor<?> msf = Reflection.getField(ep, ms, 0);
+    Class<?> serverpingclazz = Reflection.getClass("{nms}.ServerPing");
+    Reflection.FieldAccessor<?> sp_ = Reflection.getField(ms, serverpingclazz, 0);
+    Class<?> serverdataclazz = Reflection.getClass("{nms}.ServerPing$ServerData");
+    Reflection.FieldAccessor<?> sd_ = Reflection.getField(serverpingclazz, serverdataclazz, 0);
+    Reflection.MethodInvoker gpv = Reflection.getMethod(serverdataclazz, "getProtocolVersion");
+
+    Reflection.FieldAccessor<GameProfile> gp_ = Reflection.getField(ep, GameProfile.class, 0);
+    //Class<?> PlayerList = Reflection.getClass("{nms}.PlayerList");
+    //Reflection.FieldAccessor<?> getPlayerList = Reflection.getField(ms, PlayerList, 0);
+    //Class<?> DimensionManager = Reflection.getClass("{nms}.DimensionManager");
+    //Reflection.FieldAccessor<?> dm = Reflection.getField(ep, DimensionManager, 0);
+
 
     public MCSBukkitServer(Plugin plugin) {
         this.plugin = plugin;
 
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+
+
+        protocol = new TinyProtocol(plugin) {};
+        replaceSkin = getSkin(plugin.getConfig().getString("Modules.SkinChecker.auto-change-skin.replacement"));
     }
 
     @EventHandler
@@ -45,19 +87,38 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
                 System.out.println(pp.getName() + "[" + pp.getUniqueId().toString() + "] - Fetching MCSProfile...");
 
+                Object ep_ = null;
+                int version = -1;
+                try {
+                    ep_ = getHandle.invoke(pp);
+
+                    if (plugin.getServer().getPluginManager().isPluginEnabled("ViaVersion")) {
+                        version = Via.getAPI().getPlayerVersion(pp.getUniqueId());
+                    } else {
+                        Object msf_ = msf.get(ep_);
+                        Object sp = sp_.get(msf_);
+                        Object sd = sd_.get(sp);
+
+                            version = Integer.getInteger(gpv.invoke(sd).toString());
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+
+
                 MCSPlayer player = null;
                 try {
                     player = MCSCore.getInstance().playerJoin(pp.getUniqueId(),
                             pp.getName(),
                             e.getAddress().getHostAddress(),
                             e.getHostname(),
-                            -1);
+                            version);
                 } catch (IOException | InterruptedException | ExecutionException ex) {
                     ex.printStackTrace();
                 }
 
                 if (player == null) {
-                    pp.kickPlayer(("§cThere was an Error with your profile!"));
+                    Bukkit.getScheduler().runTask(plugin, () -> pp.kickPlayer("§cThere was an Error with your profile!"));
                     return;
                 }
 
@@ -85,7 +146,7 @@ public class MCSBukkitServer implements MCSServer, Listener {
                         replace.put("days", days);
                     }
 
-                    pp.kickPlayer(MCSCore.getInstance().buildScreen(lang, ban.getExpire() != 0 ? "ban.temp.screen" : "ban.perm.screen", replace));
+                    player.disconnect(MCSCore.getInstance().buildScreen(lang, ban.getExpire() != 0 ? "ban.temp.screen" : "ban.perm.screen", replace));
                     return;
                 }
 
@@ -99,16 +160,16 @@ public class MCSBukkitServer implements MCSServer, Listener {
                                 if (pp1.hasPermission("MCStatsNET.gban.alert"))
                                     pp1.sendMessage((ChatColor.translateAlternateColorCodes('&', checks.getGBan().getAlert())));
 
-                            pp.kickPlayer((ChatColor.translateAlternateColorCodes('&', checks.getGBan().getScreen())));
+                            player.disconnect((ChatColor.translateAlternateColorCodes('&', checks.getGBan().getScreen())));
 
                             return;
                         }
                     }
 
-                    if (plugin.getConfig().getBoolean("Modules.SkinChecker.enabled") && checks.getSkin() != null && checks.getSkin().isBlocked()) {
+                    if (plugin.getConfig().getBoolean("Modules.SkinChecker.enabled") && player.getSkin() != null && player.getSkin().getStatus().equals(MCSPlayerData.SkinStatus.BLACKLISTED)) {
                         if (!pp.hasPermission("MCStatsNET.SkinChecker.bypass")) {
                             HashMap<String, Object> replace = new HashMap<>();
-                            replace.put("id", checks.getVPN().getID());
+                            replace.put("id", player.getSkin().getID());
                             replace.put("playername", pp.getName());
                             MCSCore.getInstance().broadcast("MCStatsNET.SkinChecker.alert", "checks.prefix", "checks.SkinChecker.alert", replace);
 
@@ -116,16 +177,81 @@ public class MCSBukkitServer implements MCSServer, Listener {
                                 if (!pp.hasPermission("MCStatsNET.ban.bypass"))
                                     player.createCustomBan(new MCSConsole(), plugin.getConfig().getString("Modules.SkinChecker.auto-ban.reason"), plugin.getConfig().getInt("Modules.SkinChecker.auto-ban.expire"));
                             } else {
-                                replace = new HashMap<>();
-                                replace.put("id", checks.getVPN().getID());
-                                replace.put("playername", pp.getName());
-                                pp.kickPlayer(MCSCore.getInstance().buildScreen(lang, "checks.SkinChecker.screen", replace));
+                                if (plugin.getConfig().getBoolean("Modules.SkinChecker.auto-change-skin.enabled") && replaceSkin != null) {
+                                    try {
+                                        if (gp_.hasField(ep_)) {
+                                            GameProfile gp = gp_.get(ep_);
+
+                                            gp.getProperties().clear();
+                                            gp.getProperties().put("textures", replaceSkin);
+                                            gp_.set(ep_, gp);
+
+
+                                                Reflection.MethodInvoker gei = Reflection.getMethod(Reflection.getClass("{obc}.entity.CraftEntity"), "getEntityId");
+                                                Reflection.ConstructorInvoker PacketPlayOutEntityDestroyCon = Reflection.getConstructor("{nms}.PacketPlayOutEntityDestroy");
+                                                System.out.println(gei.invoke(ep_));
+                                                Object packetDestroyPlayer = PacketPlayOutEntityDestroyCon.invoke((int)gei.invoke(ep_));
+                                                Class<?> infoActionClass = Reflection.getClass("{nms}.PacketPlayOutPlayerInfo$EnumPlayerInfoAction");
+                                                Reflection.ConstructorInvoker PacketPlayOutPlayerInfoCon = Reflection.getConstructor("{nms}.PacketPlayOutPlayerInfo", infoActionClass);
+                                                Object packetRemovePlayer = PacketPlayOutPlayerInfoCon.invoke(infoActionClass.getEnumConstants()[4], ep_);
+
+                                                Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
+                                                    Bukkit.getOnlinePlayers().forEach(pall -> {
+                                                        protocol.sendPacket(pall, packetRemovePlayer);
+                                                        if (pall != pp)
+                                                            protocol.sendPacket(pall, packetDestroyPlayer);
+                                                    });
+                                                }, 1);
+
+                                            //CraftPlayer craftPlayer = (CraftPlayer) pp;
+
+                                            /*PacketPlayOutEntityDestroy destroy = new PacketPlayOutEntityDestroy(craftPlayer.getEntityId());
+                                            PacketPlayOutPlayerInfo tabRemove = new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER, craftPlayer.getHandle());
+
+                                            Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
+                                                craftPlayer.getHandle().server.getPlayerList().moveToWorld(craftPlayer.getHandle(), craftPlayer.getHandle().dimension, false, pp.getLocation(), true);
+                                                for (Player all : Bukkit.getOnlinePlayers()) {
+                                                    CraftPlayer craftAll = (CraftPlayer) all;
+                                                    craftAll.getHandle().playerConnection.sendPacket(tabRemove);
+                                                    if (!all.equals(pp)) {
+                                                        craftAll.getHandle().playerConnection.sendPacket(destroy);
+                                                    }
+                                                }
+                                            }, 1);*/
+
+                                            //PacketPlayOutNamedEntitySpawn spawn = new PacketPlayOutNamedEntitySpawn(craftPlayer.getHandle());
+                                            //PacketPlayOutPlayerInfo tabAdd = new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER, craftPlayer.getHandle());
+
+                                            /*Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
+                                                for (Player all : Bukkit.getOnlinePlayers()) {
+                                                    CraftPlayer craftAll = (CraftPlayer) all;
+                                                    craftAll.getHandle().playerConnection.sendPacket(tabAdd);
+                                                    if (!all.equals(pp)) {
+                                                        craftAll.getHandle().playerConnection.sendPacket(spawn);
+                                                    }
+                                                }
+                                            }, 20);*/
+                                        }
+                                    } catch (Exception ex) {
+                                        ex.printStackTrace();
+                                        replace = new HashMap<>();
+                                        replace.put("id", player.getSkin().getID());
+                                        replace.put("playername", pp.getName());
+                                        player.disconnect(MCSCore.getInstance().buildScreen(lang, "checks.SkinChecker.screen", replace));
+                                    }
+
+                                } else {
+                                    replace = new HashMap<>();
+                                    replace.put("id", player.getSkin().getID());
+                                    replace.put("playername", pp.getName());
+                                    player.disconnect(MCSCore.getInstance().buildScreen(lang, "checks.SkinChecker.screen", replace));
+                                }
                             }
                             return;
 
                         } else {
                             HashMap<String, Object> replace = new HashMap<>();
-                            replace.put("id", checks.getSkin().getID());
+                            replace.put("id", player.getSkin().getID());
                             replace.put("playername", pp.getName());
                             MCSCore.getInstance().broadcast("MCStatsNET.SkinChecker.alert", "checks.prefix", "checks.SkinChecker.alertButIgnore", replace);
                         }
@@ -144,7 +270,7 @@ public class MCSBukkitServer implements MCSServer, Listener {
                             } else {
                                 replace = new HashMap<>();
                                 replace.put("id", checks.getVPN().getID());
-                                pp.kickPlayer(MCSCore.getInstance().buildScreen(lang, "checks.AntiVPN.screen", replace));
+                                player.disconnect(MCSCore.getInstance().buildScreen(lang, "checks.AntiVPN.screen", replace));
                             }
                             return;
 
@@ -166,6 +292,35 @@ public class MCSBukkitServer implements MCSServer, Listener {
     public void on(PlayerQuitEvent e) throws Exception {
         Player p = e.getPlayer();
         MCSCore.getInstance().playerQuit(p.getUniqueId());
+    }
+
+    @EventHandler
+    public void on(AsyncPlayerChatEvent e) {
+        //MCSCore.getInstance().getChatLog().log(e.getPlayer().getUniqueId(), ChatLogType.MESSAGE, e.getMessage());
+
+        try {
+            MCSCore.getInstance().getChatLog().log(new ChatLogDataMessage(e.getPlayer().getUniqueId(), e.getMessage()));
+
+            MCSPlayer p = MCSCore.getInstance().getPlayer(e.getPlayer().getUniqueId());
+
+            e.setCancelled(MCSCore.getInstance().getChatFilter().check(p, e.getMessage()));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    @EventHandler
+    public void on(PlayerCommandPreprocessEvent e) {
+
+        try {
+            MCSCore.getInstance().getChatLog().log(new ChatLogDataCommand(e.getPlayer().getUniqueId(), e.getMessage()));
+
+            MCSPlayer p = MCSCore.getInstance().getPlayer(e.getPlayer().getUniqueId());
+
+            e.setCancelled(MCSCore.getInstance().getChatFilter().check(p, e.getMessage()));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 
     @Override
@@ -285,6 +440,11 @@ public class MCSBukkitServer implements MCSServer, Listener {
             }
 
             @Override
+            public String getName() {
+                return plugin.getServer().getName();
+            }
+
+            @Override
             public int getPort() {
                 return plugin.getServer().getPort();
             }
@@ -308,11 +468,7 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
     @Override
     public void shutdown(String message) {
-        try {
-            Arrays.stream(getPlayers()).forEach(p -> p.disconnect(message));
-        } catch (InterruptedException | ExecutionException | IOException e) {
-            e.printStackTrace();
-        }
+        Arrays.stream(getPlayers()).forEach(p -> p.disconnect(message));
 
         shutdown();
     }
@@ -323,13 +479,17 @@ public class MCSBukkitServer implements MCSServer, Listener {
     }
 
     @Override
-    public MCSPlayer[] getPlayers() throws InterruptedException, ExecutionException, IOException {
-        List<MCSPlayer> data = new ArrayList<>();
-
-        for(Player p : plugin.getServer().getOnlinePlayers())
-            data.add(MCSCore.getInstance().getPlayer(p.getUniqueId()));
-
-        return data.toArray(new MCSPlayer[0]);
+    public MCSPlayer[] getPlayers() {
+        return plugin.getServer().getOnlinePlayers().stream()
+                .map((player -> {
+                    try {
+                        return MCSCore.getInstance().getPlayer(player.getUniqueId());
+                    } catch (IOException | InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                }))
+                .collect(Collectors.toList()).toArray(new MCSPlayer[0]);
     }
 
     @Override
@@ -339,16 +499,26 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
     @Override
     public void broadcast(String message) {
-        plugin.getServer().broadcastMessage(message);
+        for (MCSPlayer p : getPlayers())
+            p.sendMessage(message);
     }
 
     @Override
     public void broadcast(String perm, String message) {
-        plugin.getServer().broadcast(perm, message);
+        for (MCSPlayer p : getPlayers())
+            if (p.hasPermission(perm))
+                p.sendMessage(message);
     }
 
     @Override
     public boolean hasPermission(MCSPlayer player, String s) {
+        if (plugin.getServer().getPluginManager().isPluginEnabled("MCPerms"))
+            if (MCPerms.getInstance().getManager().hasPermission(player, s))
+                return true;
+
+        if (!isOnline(player))
+            return false;
+
         return plugin.getServer().getPlayer(player.getUUID()).hasPermission(s);
     }
 
@@ -359,14 +529,75 @@ public class MCSBukkitServer implements MCSServer, Listener {
     }
 
     @Override
+    public void playSound(MCSPlayer player, String sound, float volume, float pitch) {
+        if (!isOnline(player))
+            return;
+
+        Sound sound1 = null;
+        for (Sound a : Sound.values()) {
+            System.out.println(a.name());
+            if (a.name().equals(sound)) {
+                sound1 = a;
+                break;
+            }
+        }
+
+        if (sound1 == null)
+            return;
+
+        Player p = plugin.getServer().getPlayer(player.getUUID());
+        p.playSound(p.getLocation(), sound1, volume, pitch);
+    }
+
+    @Override
+    public void sendTitle(MCSPlayer player, Integer fadeIn, Integer stay, Integer fadeOut, String title, String subTitle) {
+        if (!isOnline(player))
+            return;
+
+        Player p = plugin.getServer().getPlayer(player.getUUID());
+        TitleAPI.sendFullTitle(p, fadeIn, stay, fadeOut, title, subTitle);
+    }
+
+    @Override
+    public void sendActionBar(MCSPlayer player, String message, int duration) {
+        if (!isOnline(player))
+            return;
+
+        Player p = plugin.getServer().getPlayer(player.getUUID());
+        new ActionBarAPI().sendActionBar(p, message, duration);
+    }
+
+    @Override
     public void sendMessage(MCSPlayer player, String message) {
         if (isOnline(player))
             plugin.getServer().getPlayer(player.getUUID()).sendMessage(message);
     }
 
     @Override
+    public void sendMessage(MCSPlayer player, BaseComponent message) {
+        if (isOnline(player))
+            plugin.getServer().getPlayer(player.getUUID()).spigot().sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
+    }
+
+    @Override
+    public void sendMessage(MCSPlayer player, BaseComponent[] message) {
+        if (isOnline(player))
+            plugin.getServer().getPlayer(player.getUUID()).spigot().sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
+    }
+
+    @Override
     public void sendConsole(String message) {
         plugin.getServer().getConsoleSender().sendMessage(message);
+    }
+
+    @Override
+    public void sendConsole(BaseComponent message) {
+        plugin.getServer().getConsoleSender().spigot().sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
+    }
+
+    @Override
+    public void sendConsole(BaseComponent[] message) {
+        plugin.getServer().getConsoleSender().spigot().sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
     }
 
     public boolean dispatchCommand(CommandSender cs, String cmd, String[] args) throws InterruptedException, ExecutionException, IOException {
@@ -377,5 +608,31 @@ public class MCSBukkitServer implements MCSServer, Listener {
             s = new MCSConsole();
 
         return MCSCore.getInstance().dispatchCommand(s, cmd, args);
+    }
+
+    private static Property getSkin(String id) {
+        try {
+            RequestBuilder rb = new RequestBuilder("https://api.mcstats.net/v2/skin/" + id);
+
+            RequestResponse rr = rb.get();
+
+            if (rr.getStatusCode() != 200)
+                return null;
+
+            JsonObject data = rr.getContentJsonObject();
+            JsonObject response = data.get("response").getAsJsonObject();
+            JsonObject system = data.get("system").getAsJsonObject();
+
+            if (system.get("status").getAsInt() != 200)
+                return null;
+
+            String value = response.get("value").getAsString();
+            String signature = response.get("signature").getAsString();
+
+            return new Property("textures", value, signature);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }

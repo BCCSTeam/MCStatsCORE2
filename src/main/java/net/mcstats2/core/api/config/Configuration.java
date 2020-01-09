@@ -59,6 +59,10 @@ public final class Configuration {
         return this.get(path, this.getDefault(path));
     }
 
+    public boolean isSet(String path) {
+        return get(path) != null;
+    }
+
     public Object getDefault(String path) {
         return this.defaults == null ? null : this.defaults.get(path);
     }

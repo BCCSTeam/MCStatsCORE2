@@ -9,10 +9,12 @@ import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEvent.MCSEvent;
 import net.mcstats2.core.api.MCSEvent.MCSEventType;
 import net.mcstats2.core.api.MCSEvent.player.MCSEventPlayerUpdate;
-import net.mcstats2.core.api.MCSServer.MCSBungeeServer;
 import net.mcstats2.core.api.MCSServer.MCSServer;
+import net.mcstats2.core.api.MCSShutdownAble;
+import net.mcstats2.core.modules.ChatFilter;
+import net.mcstats2.core.modules.chatlog.ChatLog;
 import net.mcstats2.core.network.mysql.MySQL;
-import net.mcstats2.core.api.commands.*;
+import net.mcstats2.core.commands.*;
 import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
 import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
@@ -31,6 +33,7 @@ import net.mcstats2.core.network.web.data.task.MCSTaskType;
 import net.mcstats2.core.network.web.data.task.player.*;
 import net.mcstats2.core.network.web.data.task.server.MCSTaskServerBanCreateReason;
 import net.mcstats2.core.network.web.data.task.server.MCSTaskServerMuteCreateReason;
+import net.mcstats2.core.utils.StringUtils;
 import net.mcstats2.core.utils.version.Version;
 
 import java.io.*;
@@ -39,7 +42,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 public class MCSCore {
@@ -71,13 +74,24 @@ public class MCSCore {
 
     private final Map<MCSEventType, List<Consumer<MCSEvent>>> eventMap = new HashMap<>();
 
+    private ArrayList<Supplier<Void>> reload = new ArrayList<>();
+    private ArrayList<MCSShutdownAble> shutdown = new ArrayList<>();
+
+    private File plugin;
     private File pluginDir;
+    private Configuration config = null;
     private Configuration lang = null;
     private HashMap<String, Configuration> langs = new HashMap<>();
 
-    public MCSCore(File pluginDir, MCSServer server, MySQL database) throws MCSError, MCSServerRegistrationFailed, IOException, ExecutionException, InterruptedException, MCSServerAuthFailed {
+    // Module
+    private ChatLog chatLog;
+    private ChatFilter chatFilter;
+
+    public MCSCore(File plugin, File pluginDir, Configuration config, MCSServer server, MySQL database) throws MCSError, MCSServerRegistrationFailed, IOException, ExecutionException, InterruptedException, MCSServerAuthFailed {
         instance = this;
+        this.plugin = plugin;
         this.pluginDir = pluginDir;
+        this.config = config;
         this.server = server;
         mysql = database;
 
@@ -138,10 +152,11 @@ public class MCSCore {
             if (server.getServerDetails().isCloudSystem()) {
                 rb.putParam("details[server][cloud][id]", server.getServerDetails().getCloudSystem().getId());
                 rb.putParam("details[server][cloud][wrapper]", server.getServerDetails().getCloudSystem().getWrapperId());
-                rb.putParam("details[server][cloud][name]", server.getServerDetails().getCloudSystem().getGroup());
+                rb.putParam("details[server][cloud][group]", server.getServerDetails().getCloudSystem().getGroup());
                 rb.putParam("details[server][cloud][static]", server.getServerDetails().getCloudSystem().isStatic());
             }
 
+            rb.putParam("details[server][name]", server.getServerDetails().getName());
             rb.putParam("details[server][port]", server.getServerDetails().getPort());
             rb.putParam("details[server][onlinemode]", server.getServerDetails().isOnlineMode());
             rb.putParam("details[server][type]", server.getServerDetails().getType().name());
@@ -211,10 +226,11 @@ public class MCSCore {
             if (server.getServerDetails().isCloudSystem()) {
                 rb.putParam("details[server][cloud][id]", server.getServerDetails().getCloudSystem().getId());
                 rb.putParam("details[server][cloud][wrapper]", server.getServerDetails().getCloudSystem().getWrapperId());
-                rb.putParam("details[server][cloud][name]", server.getServerDetails().getCloudSystem().getGroup());
+                rb.putParam("details[server][cloud][group]", server.getServerDetails().getCloudSystem().getGroup());
                 rb.putParam("details[server][cloud][static]", server.getServerDetails().getCloudSystem().isStatic());
             }
 
+            rb.putParam("details[server][name]", server.getServerDetails().getName());
             rb.putParam("details[server][port]", server.getServerDetails().getPort());
             rb.putParam("details[server][onlinemode]", server.getServerDetails().isOnlineMode());
             rb.putParam("details[server][type]", server.getServerDetails().getType().name());
@@ -283,6 +299,10 @@ public class MCSCore {
         return instance;
     }
 
+    public Configuration getConfig() {
+        return config;
+    }
+
     public MySQL getMySQL() {
         return mysql;
     }
@@ -291,7 +311,19 @@ public class MCSCore {
         return server;
     }
 
+    public ChatLog getChatLog() {
+        return chatLog;
+    }
+
+    public ChatFilter getChatFilter() {
+        return chatFilter;
+    }
+
     private void start() {
+        chatLog = new ChatLog();
+        addShutdownAble(chatLog);
+        chatFilter = new ChatFilter();
+
         t.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -311,7 +343,7 @@ public class MCSCore {
                     rb.putParam("details[memory][free]", freeMem);
                     rb.putParam("details[memory][used]", maxMem - freeMem);
 
-                    MCSQueryData data = pharseQuery(rb.post());
+                    MCSQueryData data = parseQuery(rb.post());
 
                     if (data == null)
                         return;
@@ -344,7 +376,7 @@ public class MCSCore {
 
                     ArrayList<String> failed = new ArrayList<>();
                     running.forEach((a, b) -> {
-                        if (b <= System.currentTimeMillis() + 1000*60*5) {
+                        if (b <= System.currentTimeMillis() + 1000*60*15) {
                             try {
                                 failed.add(a.getId());
                                 updateTaskState(a, TaskState.TIMEOUT);
@@ -377,6 +409,33 @@ public class MCSCore {
                                 MCSPlayer p = getPlayer(j.getReceiver());
                                 if (p.isOnline())
                                     p.sendMessage(j.getMessage());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_TITLE)) {
+                                MCSTaskPlayerTitle j = (MCSTaskPlayerTitle) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                if (p.isOnline())
+                                    p.sendTitle(j.getFadeIn(), j.getStay(), j.getFadeOut(), j.getTitle(), j.getSubTitle());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_ACTIONBAR)) {
+                                MCSTaskPlayerActionBar j = (MCSTaskPlayerActionBar) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                if (p.isOnline())
+                                    p.sendActionBar(j.getMessage(), j.getDuration());
+
+                                updateTaskState(task, TaskState.DONE);
+
+                            } else if (task.getType().equals(MCSTaskType.PLAYER_SOUND)) {
+                                MCSTaskPlayerSound j = (MCSTaskPlayerSound) task.getTask();
+
+                                MCSPlayer p = getPlayer(j.getUUID());
+                                if (p.isOnline())
+                                    p.playSound(j.getSound(), j.getVolume(), j.getPitch());
 
                                 updateTaskState(task, TaskState.DONE);
 
@@ -506,7 +565,7 @@ public class MCSCore {
             public void run() {
                 checkUpdate(true);
             }
-        }, 0, 1000 * 60 * 5);
+        }, 0, 1000 * 60 * 30);
 
         registerCommands();
     }
@@ -515,20 +574,90 @@ public class MCSCore {
         return t;
     }
 
-    public void end() {
+    public boolean addShutdownAble(MCSShutdownAble e) {
+        return shutdown.add(e);
+    }
+
+    public void shutdown() {
         if (t != null) {
             t.purge();
             t.cancel();
             t = null;
         }
-    }
 
-    public void reload() {
         try {
-            langs.keySet().forEach(a -> langs.put(a, getLang(a)));
+            RequestBuilder rb = getAuthedRequest("/shutdown");
+            rb.post();
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        shutdown.forEach(s -> {
+            try {
+                s.shutdown();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    public void addToReload(Supplier<Void> func) {
+        reload.add(func);
+    }
+    public void reload() {
+        try {
+            File d = new File(pluginDir, "config.yml");
+            if (!d.exists()) {
+                d.createNewFile();
+
+                InputStream is = null;
+                try {
+                    is = getClass().getClassLoader().getResourceAsStream("config.yml");
+                    OutputStream os = new FileOutputStream(d);
+                    ByteStreams.copy(is, os);
+                } finally {
+                    if (is != null)
+                        is.close();
+                }
+            }
+            InputStream a = getClass().getClassLoader().getResourceAsStream("config.yml");
+            Configuration def = ConfigurationProvider.getProvider(YamlConfiguration.class).load(a);
+            config = ConfigurationProvider.getProvider(YamlConfiguration.class).load(d, def);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            File d = new File(pluginDir.getPath() + "/lang/", "default.yml");
+            if (!d.exists()) {
+                d.createNewFile();
+
+                InputStream is = null;
+                try {
+                    is = getClass().getClassLoader().getResourceAsStream("default-lang.yml");
+                    OutputStream os = new FileOutputStream(d);
+                    ByteStreams.copy(is, os);
+                } finally {
+                    if (is != null)
+                        is.close();
+                }
+            }
+            InputStream a = getClass().getClassLoader().getResourceAsStream("default-lang.yml");
+            Configuration def = ConfigurationProvider.getProvider(YamlConfiguration.class).load(a);
+            lang = ConfigurationProvider.getProvider(YamlConfiguration.class).load(d, def);
+
+            langs.keySet().forEach(b -> langs.put(b, getLang(b, true)));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        reload.forEach(s -> {
+            try {
+                s.get();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     public void checkUpdate(boolean autoupdate) {
@@ -566,7 +695,7 @@ public class MCSCore {
         if (!data.getResponse().getDownloadURL().startsWith("https://mcstats.net/") && !data.getResponse().getDownloadURL().startsWith("https://www.mcstats.net/") && !data.getResponse().getDownloadURL().startsWith("https://api.mcstats.net/"))
             throw new MCSError("Unsafe download URL! Please check manual for Updates, in cause if this error stay please contact support at support@mcstats.net and wait for future instructions!");
 
-        File home = server instanceof MCSBungeeServer ? server.getDescription().getPlugin() : new File(server.getDescription().getPlugin(), "MCStatsCORE2-" + server.getDescription().getVersion() + ".jar");
+        //File home = server instanceof MCSBungeeServer ? server.getDescription().getPlugin() : new File(server.getDescription().getPlugin(), "MCStatsCORE2-" + server.getDescription().getVersion() + ".jar");
         File a = new File(pluginDir.getPath() + "/cache/", "MCStatsCORE2-" + data.getResponse().getVersion() + ".jar");
         RequestBuilder rb = new RequestBuilder(data.getResponse().getDownloadURL());
         rb.download(a);
@@ -579,7 +708,7 @@ public class MCSCore {
         if (autoreplace) {
             server.sendConsole("§eUpdate downloaded! Moving file(MCStatsCORE2-" + data.getResponse().getVersion() + ".jar)...");
 
-            Files.move(a, home);
+            Files.move(a, plugin);
         }
 
         if (autorestart) {
@@ -597,7 +726,7 @@ public class MCSCore {
         running.remove(task);
     }
 
-    private MCSQueryData pharseQuery(RequestResponse rs) throws IOException {
+    private MCSQueryData parseQuery(RequestResponse rs) throws IOException {
         if (rs.getStatusCode() != 200)
             return null;
 
@@ -688,10 +817,24 @@ public class MCSCore {
     }
 
     private void registerCommands() {
+        // MANAGER
+        registerCommand(new MCStats("mcs"));
         registerCommand(new MCStats("mcstats"));
 
-        if (getServer().getClass().getName().startsWith("MCSBungeeServer"))
+        // TEAMCHAT
+        registerCommand(new TeamChat("tc"));
+        registerCommand(new TeamChat("teamchat"));
+
+        // TEAM ONLINE LIST
+        registerCommand(new TeamChat("team"));
+
+        if (getServer().getClass().getName().equals("MCSBungeeServer"))
             registerCommand(new Jump("jump"));
+
+        // Player Infos
+        registerCommand(new PlayerInfo("pi"));
+        registerCommand(new PlayerInfo("pinfo"));
+        registerCommand(new PlayerInfo("playerinfo"));
 
         registerCommand(new Kick("kick"));
 
@@ -702,6 +845,10 @@ public class MCSCore {
         registerCommand(new BanCustom("cban"));
         registerCommand(new Ban("ban"));
         registerCommand(new BanRemove("unban"));
+    }
+
+    public String[] getCommands() {
+        return commandMap.keySet().toArray(new String[0]);
     }
 
     private void registerCommand(Command command) {
@@ -753,7 +900,7 @@ public class MCSCore {
 
 
     public MuteTemplate createMuteTemplate(String name, String reason, int power, List<Integer> expires_) throws SQLException {
-        String id = randomString(10);
+        String id = StringUtils.randomString(10);
         String expires = new Gson().toJson(expires_);
 
         if (getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes-templates`(`id`, `name`, `text`, `power`, `expires`) VALUES (?,?,?,?,?)", id, name, reason, power, expires) != 0)
@@ -777,7 +924,7 @@ public class MCSCore {
     public MuteTemplate[] getMuteTemplatesByName(String name) throws SQLException {
         List<MuteTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ?",name + "%");
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ? ORDER BY name",name + "%");
         while (rs.next())
             templates.add(new MuteTemplate(rs));
 
@@ -792,7 +939,7 @@ public class MCSCore {
     public MuteTemplate[] getMuteTemplates(String name, int power) throws SQLException {
         List<MuteTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ? && `power`<=?", name + "%", power);
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__mutes-templates` WHERE `name` LIKE ? && `power`<=? ORDER BY name", name + "%", power);
         while (rs.next())
             templates.add(new MuteTemplate(rs));
 
@@ -851,7 +998,7 @@ public class MCSCore {
 
 
     public BanTemplate createBanTemplate(String name, String reason, int power, List<Integer> expires_) throws SQLException {
-        String id = randomString(10);
+        String id = StringUtils.randomString(10);
         String expires = new Gson().toJson(expires_);
 
         if (getMySQL().queryUpdate("INSERT INTO `MCSCore__bans-templates`(`id`, `name`, `text`, `power`, `expires`) VALUES (?,?,?,?,?)", id, name, reason, power, expires) != 0)
@@ -861,7 +1008,7 @@ public class MCSCore {
     }
 
     public BanTemplate getBanTemplateByID(String id) throws SQLException {
-        ResultSet rs = mysql.query("SELECT * FROM getMCSCore__bans-templates` WHERE `id`=? LIMIT 1", id);
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `id`=? LIMIT 1", id);
         if (!rs.next())
             return null;
         return new BanTemplate(rs);
@@ -875,7 +1022,7 @@ public class MCSCore {
     public BanTemplate[] getBanTemplatesByName(String name) throws SQLException {
         List<BanTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ?", name + "%");
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ? ORDER BY name", name + "%");
         while (rs.next())
             templates.add(new BanTemplate(rs));
 
@@ -889,7 +1036,7 @@ public class MCSCore {
     public BanTemplate[] getBanTemplates(String name, int power) throws SQLException {
         List<BanTemplate> templates = new ArrayList<>();
 
-        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ? && `power`<=?", name + "%", power);
+        ResultSet rs = mysql.query("SELECT * FROM `MCSCore__bans-templates` WHERE `name` LIKE ? && `power`<=? ORDER BY name", name + "%", power);
         while (rs.next())
             templates.add(new BanTemplate(rs));
 
@@ -946,23 +1093,13 @@ public class MCSCore {
         }
     }
 
-    private static final Random random = new Random();
-    private static final String CHARS = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNOPQRSTUVWXYZ234567890";
-    public static String randomString(int length) {
-        StringBuilder token = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            token.append(CHARS.charAt(random.nextInt(CHARS.length())));
-        }
-        return token.toString();
-    }
-
     private enum TaskState {
         DONE(1),
         FAILED(-1),
         UNSUPPORTED(-2),
         TIMEOUT(-3);
 
-        int code;
+        private int code;
 
         TaskState(int code) {
             this.code = code;
@@ -973,9 +1110,11 @@ public class MCSCore {
         }
     }
 
-
     public Configuration getLang(String lang) {
-        if (langs.containsKey(lang))
+        return getLang(lang, false);
+    }
+    public Configuration getLang(String lang, boolean forceLoad) {
+        if (langs.containsKey(lang) && !forceLoad)
             return langs.get(lang);
 
         try {
@@ -1002,16 +1141,13 @@ public class MCSCore {
     public void broadcast(String permission, String prefixPath, String path, HashMap<String, Object> replace) throws InterruptedException, ExecutionException, IOException {
         String message = lang.getString(path);
 
-        for (Map.Entry r : replace.entrySet()) {
-            if (r.getKey() != null)
-                message = message.replace("%" + r.getKey().toString() + "%", r.getValue() != null ? r.getValue().toString() : "?");
-        }
+        message = StringUtils.replace(message, replace);
 
         getServer().sendConsole(ChatColor.translateAlternateColorCodes('&', lang.getString(prefixPath) + message));
 
         for (MCSPlayer p : getServer().getPlayers()) {
             if (p.hasPermission(permission)) {
-                Configuration lang = getLang(p.getSession().getAddressDetails().getLanguage());
+                Configuration lang = p.getLang();
 
                 message = lang.getString(path);
 
@@ -1025,63 +1161,17 @@ public class MCSCore {
     }
 
     public String buildScreen(Configuration lang, String path, HashMap<String, Object> replace) {
-        String reason = "";
+        StringBuilder reason = new StringBuilder();
 
         for (String message : lang.getStringList(path)) {
-            if (!reason.isEmpty())
-                reason += "\n";
+            if (reason.length() > 0)
+                reason.append("\n");
 
-            for (Map.Entry r : replace.entrySet())
-                if (r.getKey() != null)
-                    message = message.replace("%" + r.getKey().toString() + "%", r.getValue() != null ? r.getValue().toString() : "?");
+            message = StringUtils.replace(message, replace);
 
-            reason += ChatColor.translateAlternateColorCodes('&', message);
+            reason.append(ChatColor.translateAlternateColorCodes('&', message));
         }
 
-        return reason;
-    }
-
-    public static int getExpire(String timestr) {
-        if (timestr.equals(0))
-            return 0;
-
-        Pattern tsr = Pattern.compile("([0-9]+[yMwdhms])");
-        Matcher m = tsr.matcher(timestr);
-
-        int time = 0;
-        int i = 0;
-        while (m.find()) {
-            i++;
-            String group = m.group(0);
-            String key = group.substring(group.length() - 1);
-            int value = Integer.parseInt(group.substring(0, group.length() - 1));
-
-            switch (key) {
-                case "y":
-                    time += value * 12 * 4 * 7 * 24 * 60 * 60;
-                    break;
-                case "M":
-                    time += value * 4 * 7 * 24 * 60 * 60;
-                    break;
-                case "w":
-                    time += value * 7 * 24 * 60 * 60;
-                    break;
-                case "d":
-                    time += value * 24 * 60 * 60;
-                    break;
-                case "h":
-                    time += value * 60 * 60;
-                    break;
-                case "m":
-                    time += value * 60;
-                    break;
-                case "s":
-                    time += value;
-                    break;
-                default:
-                    break;
-            }
-        }
-        return i == 0 ? -1 : time;
+        return reason.toString();
     }
 }

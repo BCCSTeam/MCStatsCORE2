@@ -6,7 +6,7 @@
 
     <groupId>net.mcstats2</groupId>
     <artifactId>MCStatsCORE2</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 
     <build>
         <resources>
@@ -112,10 +112,10 @@
         </repository>-->
 
 
-        <repository>
+        <!--<repository>
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
-        </repository>
+        </repository>-->
 
         <repository>
             <id>mcstats-maven</id>
@@ -133,6 +133,11 @@
         </repository>
 
         <repository>
+            <id>viaversion-repo</id>
+            <url>https://repo.viaversion.com</url>
+        </repository>
+
+        <repository>
             <id>clojars</id>
             <url>http://clojars.org/repo/</url>
         </repository>
@@ -147,16 +152,24 @@
     <dependencies>
 
         <dependency>
-            <groupId>org.bukkit</groupId>
-            <artifactId>bukkit</artifactId>
-            <version>1.8-R0.1-SNAPSHOT</version>
+            <groupId>net.mcstats2</groupId>
+            <artifactId>MCPerms</artifactId>
+            <version>1.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.spigotmc</groupId>
+            <artifactId>spigot</artifactId>
+            <version>1.13.2</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>net.md-5</groupId>
             <artifactId>bungeecord-api</artifactId>
-            <version>1.8-SNAPSHOT</version>
+            <version>1.15-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 
@@ -178,6 +191,13 @@
             <groupId>cloud.timo.TimoCloud</groupId>
             <artifactId>TimoCloud-API</artifactId>
             <version>5.3.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>us.myles</groupId>
+            <artifactId>viaversion</artifactId>
+            <version>2.1.3</version>
             <scope>provided</scope>
         </dependency>
 

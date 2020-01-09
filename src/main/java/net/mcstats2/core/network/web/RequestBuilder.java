@@ -4,13 +4,11 @@ import com.google.common.io.ByteStreams;
 import net.mcstats2.core.MCSCore;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
-import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.client.LaxRedirectStrategy;
@@ -37,10 +35,20 @@ public class RequestBuilder implements Cloneable {
 
     private HttpAsyncClientBuilder client = HttpAsyncClients.custom().setRedirectStrategy(new LaxRedirectStrategy());
 
+    public RequestBuilder(RequestBuilder rb) {
+        request = rb.request;
+        headers = rb.headers;
+        params = rb.params;
+        paramsArray = rb.paramsArray;
+    }
+
     public RequestBuilder(String request) {
         this.request = request;
 
-        client.setUserAgent("MCStatsCORE2/" + MCSCore.getInstance().getServer().getDescription().getVersion());
+        if (MCSCore.getInstance() != null && MCSCore.getInstance().getServer() != null)
+            client.setUserAgent("MCStatsCORE2/" + MCSCore.getInstance().getServer().getDescription().getVersion());
+        else
+            client.setUserAgent("MCStatsCORE2/?");
     }
 
 
@@ -227,15 +235,22 @@ public class RequestBuilder implements Cloneable {
                 http.addHeader(new BasicHeader(arg.getKey(), arg.getValue().toString()));
 
             File downloaded = client.execute(http, new FileDownloadResponseHandler(dstFile));
+
+            return downloaded;
         } finally {
             client.close();
         }
 
-        return null;
+        //return null;
     }
 
-    public RequestBuilder clone() throws CloneNotSupportedException {
-        return (RequestBuilder) super.clone();
+    @Override
+    public Object clone() throws CloneNotSupportedException {
+        return super.clone();
+        //return new RequestBuilder(this);
+
+        /*Gson gson = new Gson();
+        return gson.fromJson(gson.toJson(this), RequestBuilder.class);*/
     }
 
     private static class FileDownloadResponseHandler implements ResponseHandler<File> {
@@ -247,7 +262,7 @@ public class RequestBuilder implements Cloneable {
         }
 
         @Override
-        public File handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
+        public File handleResponse(HttpResponse response) throws IOException {
             InputStream is = response.getEntity().getContent();
 
             try {

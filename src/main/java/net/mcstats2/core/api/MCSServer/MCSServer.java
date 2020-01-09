@@ -1,6 +1,8 @@
 package net.mcstats2.core.api.MCSServer;
 
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
+import net.mcstats2.core.api.chat.BaseComponent;
+import net.mcstats2.core.api.chat.TextComponent;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,7 +17,7 @@ public interface MCSServer {
     void shutdown(String message);
     void shutdown();
 
-    MCSPlayer[] getPlayers() throws InterruptedException, ExecutionException, IOException;
+    MCSPlayer[] getPlayers();// throws InterruptedException, ExecutionException, IOException;
 
     boolean isOnline(MCSPlayer player);
 
@@ -27,9 +29,26 @@ public interface MCSServer {
 
     void disconnect(MCSPlayer player, String reason);
 
-    void sendMessage(MCSPlayer player, String message);
+    void playSound(MCSPlayer player, String sound, float volume, float pitch);
 
-    void sendConsole(String message);
+    void sendTitle(MCSPlayer player, Integer fadeIn, Integer stay, Integer fadeOut, String title, String subTitle);
+
+    void sendActionBar(MCSPlayer player, String message, int duration);
+
+    default void sendMessage(MCSPlayer player) {
+        sendMessage(player, "");
+    }
+    default void sendMessage(MCSPlayer player, String message) {
+        sendMessage(player, TextComponent.fromLegacyText(message));
+    }
+    void sendMessage(MCSPlayer player, BaseComponent message);
+    void sendMessage(MCSPlayer player, BaseComponent[] message);
+
+    default void sendConsole(String message) {
+        sendConsole(TextComponent.fromLegacyText(message));
+    }
+    void sendConsole(BaseComponent message);
+    void sendConsole(BaseComponent[] message);
 
     interface PluginDescription {
         File getPlugin();
@@ -44,6 +63,8 @@ public interface MCSServer {
     interface ServerDetails {
         boolean isCloudSystem();
         CloudDetails getCloudSystem();
+
+        String getName();
 
         int getPort();
 
@@ -72,7 +93,8 @@ public interface MCSServer {
 
         enum CloudType {
             CLOUDNET,
-            TIMOCLOUD
+            TIMOCLOUD,
+            CUSTOM
         }
     }
 }

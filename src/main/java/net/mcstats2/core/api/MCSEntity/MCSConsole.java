@@ -1,6 +1,7 @@
 package net.mcstats2.core.api.MCSEntity;
 
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.chat.BaseComponent;
 import net.mcstats2.core.api.config.Configuration;
 
 import java.util.UUID;
@@ -26,12 +27,12 @@ public class MCSConsole implements MCSEntity {
     }
 
     @Override
-    public void sendMessage() {
-        sendMessage("");
+    public void sendMessage(BaseComponent s) {
+        MCSCore.getInstance().getServer().sendConsole(s);
     }
 
     @Override
-    public void sendMessage(String s) {
+    public void sendMessage(BaseComponent[] s) {
         MCSCore.getInstance().getServer().sendConsole(s);
     }
 }

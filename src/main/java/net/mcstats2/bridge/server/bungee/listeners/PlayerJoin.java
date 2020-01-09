@@ -7,9 +7,12 @@ import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSEntity.MCSConsole;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
 import net.mcstats2.core.api.config.Configuration;
+import net.mcstats2.core.network.web.data.MCSPlayerData;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.connection.PendingConnection;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
+import net.md_5.bungee.api.event.LoginEvent;
 import net.md_5.bungee.api.event.ServerConnectEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
@@ -27,15 +30,15 @@ public class PlayerJoin implements Listener {
     }
 
     @EventHandler
-    public void on(ServerConnectEvent e) {
+    public void on(LoginEvent e) {
         try {
-            ProxiedPlayer pp = e.getPlayer();
+            PendingConnection pp = e.getConnection();
 
             System.out.println(pp.getName() + "[" + pp.getUniqueId().toString() + "] - Fetching MCSProfile...");
 
             MCSPlayer player = null;
             try {
-                player = MCSCore.getInstance().playerJoin(pp.getUniqueId(), pp.getName(), pp.getAddress().getAddress().getHostAddress(), e.getPlayer().getPendingConnection().getVirtualHost().getHostString(), pp.getPendingConnection().getVersion());
+                player = MCSCore.getInstance().playerJoin(pp.getUniqueId(), pp.getName(), pp.getAddress().getAddress().getHostAddress(), pp.getVirtualHost().getHostString(), pp.getVersion());
             } catch (IOException | InterruptedException | ExecutionException ex) {
                 ex.printStackTrace();
             }
@@ -77,7 +80,7 @@ public class PlayerJoin implements Listener {
                 MCSPlayer.Session.Checks checks = session.getChecks();
 
                 if (plugin.getConfig().getBoolean("Modules.gBan.enabled") && checks.getGBan() != null) {
-                    if (!pp.hasPermission("MCStatsNET.gban.bypass")) {
+                    if (!player.hasPermission("MCStatsNET.gban.bypass")) {
                         plugin.getConsole().sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', checks.getGBan().getAlert())));
                         for (ProxiedPlayer pp1 : plugin.getProxy().getPlayers())
                             if (pp1.hasPermission("MCStatsNET.gban.alert"))
@@ -89,19 +92,19 @@ public class PlayerJoin implements Listener {
                     }
                 }
 
-                if (plugin.getConfig().getBoolean("Modules.SkinChecker.enabled") && checks.getSkin() != null && checks.getSkin().isBlocked()) {
-                    if (!pp.hasPermission("MCStatsNET.SkinChecker.bypass")) {
+                if (plugin.getConfig().getBoolean("Modules.SkinChecker.enabled") && player.getSkin() != null && player.getSkin().getStatus().equals(MCSPlayerData.SkinStatus.BLACKLISTED)) {
+                    if (!player.hasPermission("MCStatsNET.SkinChecker.bypass")) {
                         HashMap<String, Object> replace = new HashMap<>();
-                        replace.put("id", checks.getVPN().getID());
+                        replace.put("id", player.getSkin().getID());
                         replace.put("playername", pp.getName());
                         MCSCore.getInstance().broadcast("MCStatsNET.SkinChecker.alert", "checks.prefix", "checks.SkinChecker.alert", replace);
 
                         if (plugin.getConfig().getBoolean("Modules.SkinChecker.auto-ban.enabled")) {
-                            if (!pp.hasPermission("MCStatsNET.ban.bypass"))
+                            if (!player.hasPermission("MCStatsNET.ban.bypass"))
                                 player.createCustomBan(new MCSConsole(), plugin.getConfig().getString("Modules.SkinChecker.auto-ban.reason"), plugin.getConfig().getInt("Modules.SkinChecker.auto-ban.expire"));
                         } else {
                             replace = new HashMap<>();
-                            replace.put("id", checks.getVPN().getID());
+                            replace.put("id", player.getSkin().getID());
                             replace.put("playername", pp.getName());
                             pp.disconnect(MCSCore.getInstance().buildScreen(lang, "checks.SkinChecker.screen", replace));
                         }
@@ -109,21 +112,21 @@ public class PlayerJoin implements Listener {
 
                     } else {
                         HashMap<String, Object> replace = new HashMap<>();
-                        replace.put("id", checks.getSkin().getID());
+                        replace.put("id", player.getSkin().getID());
                         replace.put("playername", pp.getName());
                         MCSCore.getInstance().broadcast("MCStatsNET.SkinChecker.alert", "checks.prefix", "checks.SkinChecker.alertButIgnore", replace);
                     }
                 }
 
                 if (plugin.getConfig().getBoolean("Modules.AntiVPN.enabled") && checks.getVPN() != null && checks.getVPN().isBlocked()) {
-                    if (!pp.hasPermission("MCStatsNET.AntiVPN.bypass")) {
+                    if (!player.hasPermission("MCStatsNET.AntiVPN.bypass")) {
                         HashMap<String, Object> replace = new HashMap<>();
                         replace.put("id", checks.getVPN().getID());
                         replace.put("playername", pp.getName());
                         MCSCore.getInstance().broadcast("MCStatsNET.AntiVPN.alert", "checks.prefix", "checks.AntiVPN.alert", replace);
 
                         if (plugin.getConfig().getBoolean("Modules.AntiVPN.auto-ban.enabled")) {
-                            if (!pp.hasPermission("MCStatsNET.ban.bypass"))
+                            if (!player.hasPermission("MCStatsNET.ban.bypass"))
                                 player.createCustomBan(new MCSConsole(), plugin.getConfig().getString("Modules.AntiVPN.auto-ban.reason"), plugin.getConfig().getInt("Modules.AntiVPN.auto-ban.expire"));
                         } else {
                             replace = new HashMap<>();

@@ -1,9 +1,10 @@
 package net.mcstats2.core.api.MCSEntity;
 
 import net.mcstats2.core.MCSCore;
-import net.mcstats2.core.api.MCSEvent.MCSEventType;
+import net.mcstats2.core.api.chat.BaseComponent;
 import net.mcstats2.core.api.config.Configuration;
 import net.mcstats2.core.exceptions.MCSError;
+import net.mcstats2.core.network.web.RequestResponse;
 import net.mcstats2.core.network.web.data.MCSPlayerData;
 import net.mcstats2.core.network.web.RequestBuilder;
 import net.mcstats2.core.utils.StringUtils;
@@ -46,6 +47,25 @@ public class MCSPlayer implements MCSEntity {
         return getSession().getAddressDetails().getLanguage();
     }
 
+
+    public boolean createCData(MCSPlayerData.CDataType type, String key, Object value, int expires) {
+        try {
+            RequestBuilder rb = MCSCore.getInstance().getAuthedRequest("/player/" + getUUID().toString() + "/cdata/create");
+
+            rb.putParam("type", type.name());
+            rb.putParam("key", key);
+            rb.putParam("value", value);
+            rb.putParam("expires", expires);
+
+            RequestResponse rr = rb.post();
+
+            return rr.getStatusCode() == 200;
+        } catch (IOException | InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
     public CData[] getCDatas() {
         ArrayList<CData> all = new ArrayList<>();
 
@@ -85,24 +105,45 @@ public class MCSPlayer implements MCSEntity {
         return null;
     }
     public CData getCDataByKey(MCSPlayerData.CDataType type, String key) {
-        for (CData cData : getCDatas(type))
+        if (key == null)
+            return null;
+
+        for (CData cData : getCDatas(type)) {
+            if (cData.getKey() == null)
+                continue;
+
             if (cData.getKey().equals(key))
                 return cData;
+        }
 
         return null;
     }
+
 
     public boolean isOnline() {
         return MCSCore.getInstance().getServer().isOnline(this);
     }
 
     @Override
-    public void sendMessage() {
-        sendMessage("");
+    public void sendMessage(BaseComponent s) {
+        MCSCore.getInstance().getServer().sendMessage(this, s);
     }
 
-    public void sendMessage(String message) {
-        MCSCore.getInstance().getServer().sendMessage(this, message);
+    @Override
+    public void sendMessage(BaseComponent[] s) {
+        MCSCore.getInstance().getServer().sendMessage(this, s);
+    }
+
+    public void sendTitle(Integer fadeIn, Integer stay, Integer fadeOut, String title, String subTitle) {
+        MCSCore.getInstance().getServer().sendTitle(this, fadeIn, stay, fadeOut, title, subTitle);
+    }
+
+    public void sendActionBar(String message, int duration) {
+        MCSCore.getInstance().getServer().sendActionBar(this, message, duration);
+    }
+
+    public void playSound(String sound, float volume, float pitch) {
+        MCSCore.getInstance().getServer().playSound(this, sound, volume, pitch);
     }
 
     public boolean hasPermission(String s) {
@@ -146,31 +187,35 @@ public class MCSPlayer implements MCSEntity {
         replace.put("reason", ban.getCustomReason() == null ? (ban.getReason() != null ? ban.getReason().getText() : "err") : (ban.getCustomReason().isEmpty() ? "&8&o<none>&r" : ban.getCustomReason()));
 
         if (ban.getExpire() != 0) {
+            HashMap<String, Object> expires = new HashMap<>();
             long endsIn = Math.abs(ban.getExpire());
             long seconds = (endsIn) % 60;
             long minutes = (endsIn / 60) % 60;
             long hours = (endsIn / 60 / 60) % 24;
             long days = (endsIn / 60 / 60 / 24);
-            replace.put("seconds", seconds);
-            replace.put("minutes", minutes);
-            replace.put("hours", hours);
-            replace.put("days", days);
+            expires.put("seconds", seconds);
+            expires.put("minutes", minutes);
+            expires.put("hours", hours);
+            expires.put("days", days);
 
             Timestamp end_timestamp = new Timestamp(ban.getTime() + (ban.getExpire()*1000));
-            replace.put("end_year", end_timestamp.getYear());
-            replace.put("end_month", end_timestamp.getMonth());
-            replace.put("end_date", end_timestamp.getDate());
-            replace.put("end_day", end_timestamp.getDay());
-            replace.put("end_hours", end_timestamp.getHours());
-            replace.put("end_minutes", end_timestamp.getMinutes());
-            replace.put("end_seconds", end_timestamp.getSeconds());
-        }
+            expires.put("end_year", end_timestamp.getYear());
+            expires.put("end_month", end_timestamp.getMonth());
+            expires.put("end_date", end_timestamp.getDate());
+            expires.put("end_day", end_timestamp.getDay());
+            expires.put("end_hours", end_timestamp.getHours());
+            expires.put("end_minutes", end_timestamp.getMinutes());
+            expires.put("end_seconds", end_timestamp.getSeconds());
 
-        disconnect(MCSCore.getInstance().buildScreen(getLang(), ban.getExpire() != 0 ? "ban.temp.screen" : "ban.perm.screen", replace));
+            replace.put("expires", StringUtils.replace(getLang().getString("expires.temporary"), expires));
+        } else
+            replace.put("expires", getLang().getString("expires.never"));
+
+        disconnect(MCSCore.getInstance().buildScreen(getLang(), "ban.screen", replace));
     }
 
     public Warn createWarn(MCSEntity staff, String type, String expire) throws SQLException {
-        String id = MCSCore.randomString(10);
+        String id = StringUtils.randomString(10);
 
         if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__warns`(`id`, `UUID`, `STAFF`, `type`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), type, expire) != 0)
             return getWarn(id);
@@ -206,11 +251,11 @@ public class MCSPlayer implements MCSEntity {
 
 
     public Mute createMute(MCSEntity staff, MCSCore.MuteTemplate t) throws SQLException, InterruptedException, ExecutionException, IOException {
-        int count = getMutes(t).size();
+        int count = countMutes(t, false);
         if (t.getExpires().size() <= count)
             count = t.getExpires().size() - 1;
 
-        String id = MCSCore.randomString(10);
+        String id = StringUtils.randomString(10);
         int expire = t.getExpires().get(count);
 
         if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__mutes`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire) != 0) {
@@ -221,32 +266,36 @@ public class MCSPlayer implements MCSEntity {
             replace.put("reason", mute.getCustomReason() == null ? (mute.getReason() != null ? mute.getReason().getText() : "err") : (mute.getCustomReason().isEmpty() ? "&8&o<none>&r" : mute.getCustomReason()));
 
             if (mute.getExpire() != 0) {
+                HashMap<String, Object> expires = new HashMap<>();
                 long endsIn = Math.abs(mute.getExpire());
                 long seconds = (endsIn) % 60;
                 long minutes = (endsIn / 60) % 60;
                 long hours = (endsIn / 60 / 60) % 24;
                 long days = (endsIn / 60 / 60 / 24);
-                replace.put("seconds", seconds);
-                replace.put("minutes", minutes);
-                replace.put("hours", hours);
-                replace.put("days", days);
+                expires.put("seconds", seconds);
+                expires.put("minutes", minutes);
+                expires.put("hours", hours);
+                expires.put("days", days);
 
                 Timestamp end_timestamp = new Timestamp(mute.getTime() + (mute.getExpire()*1000));
-                replace.put("end_year", end_timestamp.getYear());
-                replace.put("end_month", end_timestamp.getMonth());
-                replace.put("end_date", end_timestamp.getDate());
-                replace.put("end_day", end_timestamp.getDay());
-                replace.put("end_hours", end_timestamp.getHours());
-                replace.put("end_minutes", end_timestamp.getMinutes());
-                replace.put("end_seconds", end_timestamp.getSeconds());
-            }
+                expires.put("end_year", end_timestamp.getYear());
+                expires.put("end_month", end_timestamp.getMonth());
+                expires.put("end_date", end_timestamp.getDate());
+                expires.put("end_day", end_timestamp.getDay());
+                expires.put("end_hours", end_timestamp.getHours());
+                expires.put("end_minutes", end_timestamp.getMinutes());
+                expires.put("end_seconds", end_timestamp.getSeconds());
+
+                replace.put("expires", StringUtils.replace(getLang().getString("expires.temporary"), expires));
+            } else
+                replace.put("expires", getLang().getString("expires.never"));
 
             if (isOnline())
-                sendMessage(MCSCore.getInstance().buildScreen(getLanguageConfig(), mute.getExpire() != 0 ? "mute.perm.screen" : "mute.temp.screen", replace));
+                sendMessage(MCSCore.getInstance().buildScreen(getLanguageConfig(), "mute.screen", replace));
 
             replace.put("playername", getName());
             replace.put("staffname", staff.getName());
-            MCSCore.getInstance().broadcast("MCStatsNET.mute.alert", "mute.prefix", mute.getExpire() != 0 ? "mute.temp.alert" : "mute.perm.alert", replace);
+            MCSCore.getInstance().broadcast("MCStatsNET.mute.alert", "mute.prefix", "mute.alert", replace);
 
             return mute;
         }
@@ -254,7 +303,7 @@ public class MCSPlayer implements MCSEntity {
         return null;
     }
     public Mute createCustomMute(MCSEntity staff, String text, int expire) throws SQLException, InterruptedException, ExecutionException, IOException {
-        String id = MCSCore.randomString(10);
+        String id = StringUtils.randomString(10);
 
         if (text == null)
             text = "";
@@ -267,33 +316,37 @@ public class MCSPlayer implements MCSEntity {
             replace.put("reason", mute.getCustomReason() == null ? (mute.getReason() != null ? mute.getReason().getText() : "err") : (mute.getCustomReason().isEmpty() ? "&8&o<none>&r" : mute.getCustomReason()));
 
             if (mute.getExpire() != 0) {
+                HashMap<String, Object> expires = new HashMap<>();
                 long endsIn = Math.abs(mute.getExpire());
                 long seconds = (endsIn) % 60;
                 long minutes = (endsIn / 60) % 60;
                 long hours = (endsIn / 60 / 60) % 24;
                 long days = (endsIn / 60 / 60 / 24);
-                replace.put("seconds", seconds);
-                replace.put("minutes", minutes);
-                replace.put("hours", hours);
-                replace.put("days", days);
+                expires.put("seconds", seconds);
+                expires.put("minutes", minutes);
+                expires.put("hours", hours);
+                expires.put("days", days);
 
                 Timestamp end_timestamp = new Timestamp(mute.getTime() + (mute.getExpire()*1000));
-                replace.put("end_year", end_timestamp.getYear());
-                replace.put("end_month", end_timestamp.getMonth());
-                replace.put("end_date", end_timestamp.getDate());
-                replace.put("end_day", end_timestamp.getDay());
-                replace.put("end_hours", end_timestamp.getHours());
-                replace.put("end_minutes", end_timestamp.getMinutes());
-                replace.put("end_seconds", end_timestamp.getSeconds());
-            }
+                expires.put("end_year", end_timestamp.getYear());
+                expires.put("end_month", end_timestamp.getMonth());
+                expires.put("end_date", end_timestamp.getDate());
+                expires.put("end_day", end_timestamp.getDay());
+                expires.put("end_hours", end_timestamp.getHours());
+                expires.put("end_minutes", end_timestamp.getMinutes());
+                expires.put("end_seconds", end_timestamp.getSeconds());
+
+                replace.put("expires", StringUtils.replace(getLang().getString("expires.temporary"), expires));
+            } else
+                replace.put("expires", getLang().getString("expires.never"));
 
             if (isOnline())
-                sendMessage(MCSCore.getInstance().buildScreen(getLanguageConfig(), mute.getExpire() != 0 ? "mute.perm.screen" : "mute.temp.screen", replace));
-            
+                sendMessage(MCSCore.getInstance().buildScreen(getLanguageConfig(), "mute.screen", replace));
+
             replace.put("playername", getName());
             replace.put("staffname", staff.getName());
-            MCSCore.getInstance().broadcast("MCStatsNET.mute.alert", "mute.prefix", mute.getExpire() != 0 ? "mute.temp.alert" : "mute.perm.alert", replace);
-            
+            MCSCore.getInstance().broadcast("MCStatsNET.mute.alert", "mute.prefix", "mute.alert", replace);
+
             return mute;
         }
 
@@ -324,6 +377,23 @@ public class MCSPlayer implements MCSEntity {
 
         return mutes;
     }
+    public int countMutes(MCSCore.MuteTemplate reason, boolean onlyActives) throws SQLException {
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT COUNT(*) as 'amount' FROM `MCSCore__mutes` WHERE `UUID`=? && `reason`=?" + (onlyActives ? " && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL)" : ""), getUUID().toString(), reason == null ? "%" : reason.getID());
+        if (rs.next())
+            return rs.getInt("amount");
+
+        return 0;
+    }
+    public List<Mute> getMutes(int limit, int offset) throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Mute> mutes = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__mutes` WHERE `UUID`=? LIMIT ? OFFSET ?", getUUID().toString(), limit, offset);
+        while (rs.next()) {
+            mutes.add(new Mute(rs));
+        }
+
+        return mutes;
+    }
     public List<Mute> getMutes(MCSCore.MuteTemplate reason) throws SQLException, InterruptedException, ExecutionException, IOException {
         List<Mute> mutes = new ArrayList<>();
 
@@ -347,11 +417,11 @@ public class MCSPlayer implements MCSEntity {
 
 
     public Ban createBan(MCSEntity staff, MCSCore.BanTemplate t) throws SQLException, InterruptedException, ExecutionException, IOException {
-        int count = getBans(t).size();
+        int count = countBans(t, false);
         if (t.getExpires().size() <= count)
-                count = t.getExpires().size() - 1;
+            count = t.getExpires().size() - 1;
 
-        String id = MCSCore.randomString(10);
+        String id = StringUtils.randomString(10);
         int expire = t.getExpires().get(count);
 
         if (MCSCore.getInstance().getMySQL().queryUpdate("INSERT INTO `MCSCore__bans`(`id`, `UUID`, `STAFF`, `reason`, `expire`) VALUES (?,?,?,?,?)", id, getUUID().toString(), staff.getUUID() == null ? staff.getName() : staff.getUUID().toString(), t.getID(), expire) != 0) {
@@ -362,28 +432,33 @@ public class MCSPlayer implements MCSEntity {
             replace.put("reason", ban.getCustomReason() == null ? (ban.getReason() != null ? ban.getReason().getText() : "err") : (ban.getCustomReason().isEmpty() ? "&8&o<none>&r" : ban.getCustomReason()));
 
             if (ban.getExpire() != 0) {
+                HashMap<String, Object> expires = new HashMap<>();
                 long endsIn = Math.abs(ban.getExpire());
                 long seconds = (endsIn) % 60;
                 long minutes = (endsIn / 60) % 60;
                 long hours = (endsIn / 60 / 60) % 24;
                 long days = (endsIn / 60 / 60 / 24);
-                replace.put("seconds", seconds);
-                replace.put("minutes", minutes);
-                replace.put("hours", hours);
-                replace.put("days", days);
+                expires.put("seconds", seconds);
+                expires.put("minutes", minutes);
+                expires.put("hours", hours);
+                expires.put("days", days);
 
                 Timestamp end_timestamp = new Timestamp(ban.getTime() + (ban.getExpire()*1000));
-                replace.put("end_year", end_timestamp.getYear());
-                replace.put("end_month", end_timestamp.getMonth());
-                replace.put("end_date", end_timestamp.getDate());
-                replace.put("end_day", end_timestamp.getDay());
-                replace.put("end_hours", end_timestamp.getHours());
-                replace.put("end_minutes", end_timestamp.getMinutes());
-                replace.put("end_seconds", end_timestamp.getSeconds());
-            }
+                expires.put("end_year", end_timestamp.getYear());
+                expires.put("end_month", end_timestamp.getMonth());
+                expires.put("end_date", end_timestamp.getDate());
+                expires.put("end_day", end_timestamp.getDay());
+                expires.put("end_hours", end_timestamp.getHours());
+                expires.put("end_minutes", end_timestamp.getMinutes());
+                expires.put("end_seconds", end_timestamp.getSeconds());
+
+                replace.put("expires", StringUtils.replace(getLang().getString("expires.temporary"), expires));
+            } else
+                replace.put("expires", getLang().getString("expires.never"));
+
             replace.put("playername", getName());
             replace.put("staffname", staff.getName());
-            MCSCore.getInstance().broadcast("MCStatsNET.ban.alert", "ban.prefix", ban.getExpire() != 0 ? "ban.temp.alert" : "ban.perm.alert", replace);
+            MCSCore.getInstance().broadcast("MCStatsNET.ban.alert", "ban.prefix", "ban.alert", replace);
 
             if (isOnline())
                 disconnect(ban);
@@ -394,7 +469,7 @@ public class MCSPlayer implements MCSEntity {
         return null;
     }
     public Ban createCustomBan(MCSEntity staff, String text, int expire) throws SQLException, InterruptedException, ExecutionException, IOException {
-        String id = MCSCore.randomString(10);
+        String id = StringUtils.randomString(10);
 
         if (text == null)
             text = "";
@@ -407,28 +482,33 @@ public class MCSPlayer implements MCSEntity {
             replace.put("reason", ban.getCustomReason() == null ? (ban.getReason() != null ? ban.getReason().getText() : "err") : (ban.getCustomReason().isEmpty() ? "&8&o<none>&r" : ban.getCustomReason()));
 
             if (ban.getExpire() != 0) {
+                HashMap<String, Object> expires = new HashMap<>();
                 long endsIn = Math.abs(ban.getExpire());
                 long seconds = (endsIn) % 60;
                 long minutes = (endsIn / 60) % 60;
                 long hours = (endsIn / 60 / 60) % 24;
                 long days = (endsIn / 60 / 60 / 24);
-                replace.put("seconds", seconds);
-                replace.put("minutes", minutes);
-                replace.put("hours", hours);
-                replace.put("days", days);
+                expires.put("seconds", seconds);
+                expires.put("minutes", minutes);
+                expires.put("hours", hours);
+                expires.put("days", days);
 
                 Timestamp end_timestamp = new Timestamp(ban.getTime() + (ban.getExpire()*1000));
-                replace.put("end_year", end_timestamp.getYear());
-                replace.put("end_month", end_timestamp.getMonth());
-                replace.put("end_date", end_timestamp.getDate());
-                replace.put("end_day", end_timestamp.getDay());
-                replace.put("end_hours", end_timestamp.getHours());
-                replace.put("end_minutes", end_timestamp.getMinutes());
-                replace.put("end_seconds", end_timestamp.getSeconds());
-            }
+                expires.put("end_year", end_timestamp.getYear());
+                expires.put("end_month", end_timestamp.getMonth());
+                expires.put("end_date", end_timestamp.getDate());
+                expires.put("end_day", end_timestamp.getDay());
+                expires.put("end_hours", end_timestamp.getHours());
+                expires.put("end_minutes", end_timestamp.getMinutes());
+                expires.put("end_seconds", end_timestamp.getSeconds());
+
+                replace.put("expires", StringUtils.replace(getLang().getString("expires.temporary"), expires));
+            } else
+                replace.put("expires", getLang().getString("expires.never"));
+
             replace.put("playername", getName());
             replace.put("staffname", staff.getName());
-            MCSCore.getInstance().broadcast("MCStatsNET.ban.alert", "ban.prefix", ban.getExpire() != 0 ? "ban.temp.alert" : "ban.perm.alert", replace);
+            MCSCore.getInstance().broadcast("MCStatsNET.ban.alert", "ban.prefix", "ban.alert", replace);
 
             if (isOnline())
                 disconnect(ban);
@@ -457,6 +537,23 @@ public class MCSPlayer implements MCSEntity {
         List<Ban> bans = new ArrayList<>();
 
         ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=?", getUUID().toString());
+        while (rs.next()) {
+            bans.add(new Ban(rs));
+        }
+
+        return bans;
+    }
+    public int countBans(MCSCore.BanTemplate reason, boolean onlyActives) throws SQLException {
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT COUNT(*) as 'amount' FROM `MCSCore__bans` WHERE `UUID`=? && `reason`=?" + (onlyActives ? " && `valid`=1 && (DATE_ADD(`timestamp`,INTERVAL `expire` SECOND) >= NOW() || `expire` = 0 || `expire` IS NULL)" : ""), getUUID().toString(), reason == null ? "%" : reason.getID());
+        if (rs.next())
+            return rs.getInt("amount");
+
+        return 0;
+    }
+    public List<Ban> getBans(int limit, int offset) throws SQLException, InterruptedException, ExecutionException, IOException {
+        List<Ban> bans = new ArrayList<>();
+
+        ResultSet rs = MCSCore.getInstance().getMySQL().query("SELECT * FROM `MCSCore__bans` WHERE `UUID`=? LIMIT ? OFFSET ?", getUUID().toString(), limit, offset);
         while (rs.next()) {
             bans.add(new Ban(rs));
         }
@@ -496,12 +593,46 @@ public class MCSPlayer implements MCSEntity {
             return skin.id;
         }
 
+        public URLs getURLs() {
+            return new URLs(skin.urls);
+        }
+        public class URLs {
+            private MCSPlayerData.Response.Skin.URLs urls;
+            private URLs(MCSPlayerData.Response.Skin.URLs urls) {
+                urls = this.urls;
+            }
+
+            public String mojang() {
+                return urls.mojang;
+            }
+
+            public String raw() {
+                return urls.raw;
+            }
+
+            public String head() {
+                return urls.head;
+            }
+
+            public String body() {
+                return urls.body;
+            }
+
+            public String render() {
+                return urls.render;
+            }
+        }
+
         public String getValue() {
             return skin.value;
         }
 
         public String getSignature() {
             return skin.signature;
+        }
+
+        public MCSPlayerData.SkinStatus getStatus() {
+            return skin.status;
         }
     }
 
@@ -563,13 +694,6 @@ public class MCSPlayer implements MCSEntity {
                 this.checks = checks;
             }
 
-            public Skin getSkin() {
-                if (checks.skin == null)
-                    return null;
-
-                return new Skin(checks.skin);
-            }
-
             public Name getName() {
                 if (checks.name == null)
                     return null;
@@ -596,27 +720,6 @@ public class MCSPlayer implements MCSEntity {
                     return null;
 
                 return new GBan(checks.gban);
-            }
-
-            public class Skin {
-                MCSPlayerData.Response.Session.Checks.Skin skin;
-                
-                
-                Skin(MCSPlayerData.Response.Session.Checks.Skin skin) {
-                    this.skin = skin;
-                }
-
-                public String getID() {
-                    return skin.id;
-                }
-
-                public String getReason() {
-                    return skin.reason;
-                }
-
-                public boolean isBlocked() {
-                    return skin.block;
-                }
             }
 
             public class Name {
@@ -672,7 +775,7 @@ public class MCSPlayer implements MCSEntity {
                 public String getAlert() {
                     return gmute.alert;
                 }
-                
+
                 public String getID() {
                     return gmute.id;
                 }
@@ -787,12 +890,20 @@ public class MCSPlayer implements MCSEntity {
         public boolean setValue(Object newValue) throws InterruptedException, ExecutionException, IOException {
             RequestBuilder rb = MCSCore.getInstance().getAuthedRequest("/player/" + getUUID().toString() + "/cdata/" + getID() + "/update");
 
-            rb.putParam("value", newValue.toString());
+            rb.putParam("value", newValue);
 
-            boolean status = rb.post().getStatusCode() == 200;
+            RequestResponse rr = rb.post();
+
+            boolean status = rr.getStatusCode() == 200;
 
             if (status)
                 cdata.value = newValue;
+            else
+                try {
+                    throw new MCSError(rr.getStatusLine().getReasonPhrase());
+                } catch (MCSError mcsError) {
+                    mcsError.printStackTrace();
+                }
 
             return status;
         }
@@ -852,6 +963,10 @@ public class MCSPlayer implements MCSEntity {
 
         public int getExpire() {
             return expire;
+        }
+
+        public boolean isExpired() {
+            return System.currentTimeMillis() > getTime() + (getExpire() * 1000);
         }
 
         public boolean isValid() {
@@ -920,6 +1035,10 @@ public class MCSPlayer implements MCSEntity {
             return expire;
         }
 
+        public boolean isExpired() {
+            return System.currentTimeMillis() > getTime() + (getExpire() * 1000);
+        }
+
         public boolean isValid() {
             return valid;
         }
@@ -937,3 +1056,4 @@ public class MCSPlayer implements MCSEntity {
         }
     }
 }
+

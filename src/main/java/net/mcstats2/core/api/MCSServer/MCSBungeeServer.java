@@ -3,11 +3,14 @@ package net.mcstats2.core.api.MCSServer;
 import cloud.timo.TimoCloud.api.TimoCloudAPI;
 import de.dytanic.cloudnet.api.CloudAPI;
 import de.dytanic.cloudnet.lib.server.ProxyGroupMode;
-import de.dytanic.cloudnet.lib.server.ServerGroupMode;
+import net.mcstats2.bridge.server.bungee.MCPerms;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSEntity.MCSConsole;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
+import net.mcstats2.core.api.chat.BaseComponent;
+import net.mcstats2.core.api.chat.serializer.ComponentSerializer;
+import net.mcstats2.core.modules.chatlog.data.ChatLogDataCommand;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
@@ -18,10 +21,8 @@ import org.bukkit.event.EventHandler;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 public class MCSBungeeServer implements MCSServer, Listener {
     private Plugin plugin;
@@ -30,6 +31,24 @@ public class MCSBungeeServer implements MCSServer, Listener {
         this.plugin = plugin;
 
         plugin.getProxy().getPluginManager().registerListener(plugin, this);
+    }
+
+    @EventHandler
+    public void on(ChatEvent e) {
+        if (!(e.getSender() instanceof ProxiedPlayer))
+            return;
+
+        if (!e.isCommand() || e.isProxyCommand())
+            MCSCore.getInstance().getChatLog().log(new ChatLogDataCommand(((ProxiedPlayer) e.getSender()).getUniqueId(), e.getMessage()));
+            //MCSCore.getInstance().getChatLog().log(((ProxiedPlayer)e.getSender()).getUniqueId(), e.isCommand() ? ChatLogType.COMMAND : ChatLogType.MESSAGE, e.getMessage());
+
+        try {
+            MCSPlayer p = MCSCore.getInstance().getPlayer(((ProxiedPlayer)e.getSender()).getUniqueId());
+
+            e.setCancelled(MCSCore.getInstance().getChatFilter().check(p, e.getMessage()));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 
     @Override
@@ -108,10 +127,7 @@ public class MCSBungeeServer implements MCSServer, Listener {
                         if (isPluginEnabled("TimoCloudAPI"))
                             return TimoCloudAPI.getBungeeAPI().getThisProxy().getName();
 
-                        if (plugin.getProxy().getName().isEmpty())
-                            return "Bungee";
-
-                        return plugin.getProxy().getName();
+                        return "Bungee";
                     }
 
                     @Override
@@ -136,6 +152,11 @@ public class MCSBungeeServer implements MCSServer, Listener {
                         return null;
                     }
                 };
+            }
+
+            @Override
+            public String getName() {
+                return "Bungee";
             }
 
             @Override
@@ -171,13 +192,17 @@ public class MCSBungeeServer implements MCSServer, Listener {
     }
 
     @Override
-    public MCSPlayer[] getPlayers() throws InterruptedException, ExecutionException, IOException {
-        List<MCSPlayer> data = new ArrayList<>();
-
-        for(ProxiedPlayer pp : plugin.getProxy().getPlayers())
-            data.add(MCSCore.getInstance().getPlayer(pp.getUniqueId()));
-
-        return data.toArray(new MCSPlayer[0]);
+    public MCSPlayer[] getPlayers() {
+        return plugin.getProxy().getPlayers().stream()
+                .map((player -> {
+                    try {
+                        return MCSCore.getInstance().getPlayer(player.getUniqueId());
+                    } catch (IOException | InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                }))
+                .collect(Collectors.toList()).toArray(new MCSPlayer[0]);
     }
 
     @Override
@@ -200,7 +225,11 @@ public class MCSBungeeServer implements MCSServer, Listener {
 
     @Override
     public boolean hasPermission(MCSPlayer player, String s) {
-        if (plugin.getProxy().getPlayer(player.getUUID()) == null || !plugin.getProxy().getPlayer(player.getUUID()).isConnected())
+        if (isPluginEnabled("MCPerms"))
+            if (MCPerms.getInstance().getManager().hasPermission(player, s))
+                return true;
+
+        if (!isOnline(player))
             return false;
 
         return plugin.getProxy().getPlayer(player.getUUID()).hasPermission(s);
@@ -213,14 +242,61 @@ public class MCSBungeeServer implements MCSServer, Listener {
     }
 
     @Override
+    public void playSound(MCSPlayer player, String sound, float volume, float pitch) {
+
+    }
+
+    @Override
+    public void sendTitle(MCSPlayer player, Integer fadeIn, Integer stay, Integer fadeOut, String title, String subTitle) {
+        if (!isOnline(player))
+            return;
+
+        ProxiedPlayer pp = plugin.getProxy().getPlayer(player.getUUID());
+        plugin.getProxy().createTitle()
+                .title(TextComponent.fromLegacyText(title))
+                .subTitle(TextComponent.fromLegacyText(subTitle))
+                .fadeIn(fadeIn)
+                .stay(stay)
+                .fadeOut(fadeOut)
+                .send(pp);
+    }
+
+    @Override
+    public void sendActionBar(MCSPlayer player, String message, int duration) {
+
+    }
+
+    @Override
     public void sendMessage(MCSPlayer player, String message) {
         if (isOnline(player))
             plugin.getProxy().getPlayer(player.getUUID()).sendMessage(TextComponent.fromLegacyText(message));
     }
 
     @Override
+    public void sendMessage(MCSPlayer player, BaseComponent message) {
+        if (isOnline(player))
+            plugin.getProxy().getPlayer(player.getUUID()).sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
+    }
+
+    @Override
+    public void sendMessage(MCSPlayer player, BaseComponent[] message) {
+        if (isOnline(player))
+            plugin.getProxy().getPlayer(player.getUUID()).sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
+    }
+
+    @Override
     public void sendConsole(String message) {
         plugin.getProxy().getConsole().sendMessage(TextComponent.fromLegacyText(message));
+    }
+
+    @Override
+    public void sendConsole(BaseComponent message) {
+        plugin.getProxy().getConsole().sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
+    }
+
+    @Override
+    public void sendConsole(BaseComponent[] message) {
+        plugin.getProxy().getConsole().sendMessage(net.md_5.bungee.chat.ComponentSerializer.parse(ComponentSerializer.toString(message)));
     }
 
     public boolean dispatchCommand(CommandSender cs, String cmd, String[] args) throws InterruptedException, ExecutionException, IOException {

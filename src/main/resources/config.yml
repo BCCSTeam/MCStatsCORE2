@@ -33,8 +33,14 @@ Modules:
       - '/cc'
       - '/me'
 
+    #
+    # ChatFilter - Block UTF-8 Codes
+    #
     block_UTF-8: true
 
+    #
+    # ChatFilter - Spam
+    #
     spam:
       enabled: true
       delay: 1
@@ -46,52 +52,88 @@ Modules:
         enabled: true
         points: 10
         reason: 'Spaming'
+        expire: 900
       auto-ban:
         enabled: true
         points: 20
         reason: 'Spaming'
         expire: 900
 
+    #
+    # ChatFilter - Repeating
+    #
     repeating:
       enabled: true
       history: 5
+      auto-kick:
+        enabled: true
+        points: 3
+        reason: 'Repeating'
+      auto-mute:
+        enabled: true
+        points: 10
+        reason: 'Repeating'
+        expire: 900
+      auto-ban:
+        enabled: true
+        points: 20
+        reason: 'Repeating'
+        expire: 900
 
+    #
+    # ChatFilter - Badwords
+    #
     badwords:
       enabled: true
       auto-kick:
         enabled: true
         points: 3
-        reason: 'Spaming'
+        reason: 'Badword'
       auto-mute:
         enabled: true
         points: 10
-        reason: 'Spaming'
+        reason: 'Badword'
+        expire: 900
       auto-ban:
         enabled: true
         points: 20
-        reason: 'Spaming'
+        reason: 'Badword'
         expire: 900
 
+    #
+    # ChatFilter - Adverse (Based on Address)
+    #
     address:
       enabled: true
       whitelist:
         - '*.mcstats.net'
 
+    #
+    # ChatFilter - Adverse (Based on score list)
+    #
     adverse:
+      enabled: true
       score: 3
       auto-kick:
         enabled: true
         points: 3
-        reason: 'Spaming'
+        reason: 'Adverse'
       auto-mute:
         enabled: true
-        points: 10
-        reason: 'Spaming'
+        points: 5
+        reason: 'Adverse'
+        expire: 900
       auto-ban:
         enabled: true
-        points: 20
-        reason: 'Spaming'
+        points: 10
+        reason: 'Adverse'
         expire: 900
+
+  #
+  # ChatLog
+  #
+  ChatLog:
+    enabled: true
 
   #
   # AccountLimiter
@@ -126,6 +168,10 @@ Modules:
   #
   SkinChecker:
     enabled: true
+    auto-change-skin:
+      enabled: false
+      # MCSSkinID
+      replacement: 'c6db934597442378f478997a659d8930748a0e67'
     auto-ban:
       enabled: true
       reason: 'Bad Skin'

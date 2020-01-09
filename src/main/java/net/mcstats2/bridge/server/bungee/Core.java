@@ -3,11 +3,14 @@ package net.mcstats2.bridge.server.bungee;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import net.mcstats2.bridge.server.bungee.listeners.ChatFilter;
 import net.mcstats2.bridge.server.bungee.listeners.PlayerJoin;
 import net.mcstats2.bridge.server.bungee.listeners.PlayerQuit;
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.ChatColor;
 import net.mcstats2.core.api.MCSServer.MCSBungeeServer;
+import net.mcstats2.core.api.config.Configuration;
+import net.mcstats2.core.api.config.ConfigurationProvider;
+import net.mcstats2.core.api.config.YamlConfiguration;
 import net.mcstats2.core.network.mysql.AsyncBungeeMySQL;
 import net.mcstats2.core.network.web.data.MCSFilterData;
 import net.mcstats2.core.exceptions.MCSError;
@@ -16,13 +19,11 @@ import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.plugin.Plugin;
-import net.md_5.bungee.config.Configuration;
-import net.md_5.bungee.config.ConfigurationProvider;
-import net.md_5.bungee.config.YamlConfiguration;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class Core extends Plugin {
     private MCSCore mcs;
@@ -35,6 +36,9 @@ public class Core extends Plugin {
 
     public JsonObject players = new JsonObject();
     public ArrayList<MCSFilterData> badwords = new ArrayList<>();
+
+    Configuration news = null;
+    int pointer = 0;
 
     @Override
     public void onEnable() {
@@ -68,7 +72,7 @@ public class Core extends Plugin {
         }
 
         try {
-            MCSCore mcs = new MCSCore(getDataFolder(), new MCSBungeeServer(this), mysql.getMySQL());
+            mcs = new MCSCore(getFile(), getDataFolder(), config, new MCSBungeeServer(this), mysql.getMySQL());
         } catch (MCSError | MCSServerRegistrationFailed | IOException | ExecutionException | InterruptedException | MCSServerAuthFailed e) {
             e.printStackTrace();
         }
@@ -109,34 +113,66 @@ public class Core extends Plugin {
         getProxy().getPluginManager().registerListener(this, new PlayerJoin(this));
         getProxy().getPluginManager().registerListener(this, new PlayerQuit(this));
 
+        getProxy().getScheduler().schedule(this, () -> {
+            for (String command : mcs.getCommands())
+                getProxy().getPluginManager().registerCommand(this, new CommandManager(command));
+        }, 1, TimeUnit.SECONDS);
 
-        getProxy().getPluginManager().registerCommand(this, new CommandManager("mcstats"));
 
-        getProxy().getPluginManager().registerCommand(this, new CommandManager("jump"));
+        loadNews();
+        getProxy().getScheduler().schedule(this, () -> {
+            if (!news.getBoolean("enabled"))
+                return;
 
-        if (config.getBoolean("Modules.ChatFilter.enabled"))
-            getProxy().getPluginManager().registerListener(this, new ChatFilter(this));
+            if (!news.isSet("news.0"))
+                return;
 
-        if (config.getBoolean("Modules.Kick.enabled"))
-            getProxy().getPluginManager().registerCommand(this, new CommandManager("kick"));
+            if (getProxy().getOnlineCount() == 0)
+                return;
 
-        if (config.getBoolean("Modules.Mute.enabled")) {
-            getProxy().getPluginManager().registerCommand(this, new CommandManager("cmute"));
-            getProxy().getPluginManager().registerCommand(this, new CommandManager("mute"));
-            getProxy().getPluginManager().registerCommand(this, new CommandManager("unmute"));
-        }
+            if (!news.isSet("news." + pointer))
+                pointer = 0;
 
-        if (config.getBoolean("Modules.Ban.enabled")) {
-            getProxy().getPluginManager().registerCommand(this, new CommandManager("cban"));
-            getProxy().getPluginManager().registerCommand(this, new CommandManager("ban"));
-            getProxy().getPluginManager().registerCommand(this, new CommandManager("unban"));
+            StringBuilder sb = new StringBuilder();
+            news.getStringList("news." + pointer).forEach(s -> {
+                if (sb.length() != 0)
+                    sb.append("\n");
+
+                sb.append(ChatColor.translateAlternateColorCodes('&', s));
+            });
+            MCSCore.getInstance().getServer().broadcast(sb.toString());
+
+            pointer++;
+        }, 5, news.getInt("delay", 5), TimeUnit.SECONDS);
+        MCSCore.getInstance().addToReload(() -> {
+            loadNews();
+            return null;
+        });
+    }
+
+    private void loadNews() {
+        try {
+            File file = new File(getDataFolder(), "news.yml");
+            if(!file.exists()) {
+                file.createNewFile();
+
+                InputStream is = getResourceAsStream("news.yml");
+                OutputStream os = new FileOutputStream(file);
+                ByteStreams.copy(is, os);
+            }
+
+            news = ConfigurationProvider.getProvider(YamlConfiguration.class).load(file);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     @Override
     public void onDisable() {
-        mcs.end();
+        mcs.shutdown();
         mysql.getMySQL().closeConnection();
+
+
     }
 
     public static Core getInstance() {

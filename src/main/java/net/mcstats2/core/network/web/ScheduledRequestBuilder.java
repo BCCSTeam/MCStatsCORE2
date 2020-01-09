@@ -1,5 +1,9 @@
 package net.mcstats2.core.network.web;
 
+import com.google.gson.Gson;
+import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.MCSShutdownAble;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -7,7 +11,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutionException;
 
-public class ScheduledRequestBuilder {
+public class ScheduledRequestBuilder implements MCSShutdownAble {
     private Timer t = new Timer();
 
     private RequestBuilder request;
@@ -46,13 +50,32 @@ public class ScheduledRequestBuilder {
         t.schedule(new TimerTask() {
             @Override
             public void run() {
-                boolean run = false;
                 if (queue.size() < max || System.currentTimeMillis() < next_run)
                     return;
 
                 forcePush();
             }
         }, 500, 500);
+    }
+
+    public void setMax(int max) {
+        this.max = max;
+    }
+
+    public int getMax() {
+        return max;
+    }
+
+    public void setDelay(long delay) {
+        this.delay = delay;
+    }
+
+    public long getDelay() {
+        return delay;
+    }
+
+    public long getNext_run() {
+        return next_run;
     }
 
     public void forcePush() {
@@ -62,10 +85,10 @@ public class ScheduledRequestBuilder {
         last_run = System.currentTimeMillis();
         next_run = last_run + delay;
 
-        ArrayList<RequestBuilder> q = (ArrayList<RequestBuilder>) queue.clone();
-        queue.clear();
+        if (request.getURL().equals(MCSCore.getInstance().getAuthedRequest("/chatlog/push").getURL()))
+            System.out.println("PUSH2: " + new Gson().toJson(queue));
 
-        q.forEach(request -> {
+        queue.forEach(request -> {
             try {
                 switch (method) {
                     case GET:
@@ -80,39 +103,53 @@ public class ScheduledRequestBuilder {
                     case DELETE:
                         request.delete();
                         break;
+                    default:
+                        throw new UnsupportedOperationException(method + " is not Supported in a ScheduledRequestBuilder");
                 }
             } catch (IOException | InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
         });
+
+        queue.clear();
+        queue = new ArrayList<>();
     }
 
     public boolean addToQueue(Entry entry) {
         try {
-            RequestBuilder request = this.request.clone();
+             RequestBuilder rb = (RequestBuilder) request.clone();
 
-            request.mergeHeaders(entry.headers);
-            request.mergeParams(entry.params);
+            rb.mergeHeaders(entry.headers);
+            rb.mergeParams(entry.params);
 
-            return queue.add(request);
+            return queue.add(rb);
         } catch (CloneNotSupportedException e) {
             e.printStackTrace();
         }
 
         return false;
     }
+    public boolean addToQueue(ArrayList<Entry> entries) {
+        return addToQueue(entries.toArray(new ScheduledRequestBuilder.Entry[0]));
+    }
     public boolean addToQueue(Entry[] entries) {
         try {
-            RequestBuilder request = this.request.clone();
+            RequestBuilder rb = (RequestBuilder) request.clone();
 
-            for (Entry entry : entries) {
-                request.mergeHeaders(entry.headers);
-                request.mergeParams(entry.params);
+            if (rb.getURL().equals(MCSCore.getInstance().getAuthedRequest("/chatlog/push").getURL())) {
+                System.out.println("CLONE(O): " + new Gson().toJson(request));
+                System.out.println("CLONE(C): " + new Gson().toJson(rb));
+                System.out.println("QUEUED2: " + new Gson().toJson(entries));
             }
 
-            return queue.add(request);
-        } catch (CloneNotSupportedException e) {
-            e.printStackTrace();
+            for (Entry entry : entries) {
+                rb.mergeHeaders(entry.headers);
+                rb.mergeParams(entry.params);
+            }
+
+            return queue.add(rb);
+        } catch (CloneNotSupportedException ex) {
+            ex.printStackTrace();
         }
 
         return false;
@@ -126,7 +163,13 @@ public class ScheduledRequestBuilder {
         return new Entry();
     }
 
-    public class Entry {
+    @Override
+    public void shutdown() {
+        forcePush();
+        cancel();
+    }
+
+    public static class Entry {
         private HashMap<String, Object> headers = new HashMap<>();
         private HashMap<String, Object> params = new HashMap<>();
 

@@ -4,7 +4,7 @@ public class MCSPlayerData {
     public Response response;
     public System system;
 
-    public class Response {
+    public static class Response {
         public String UUID;
         public String name;
         public Name[] names;
@@ -18,17 +18,29 @@ public class MCSPlayerData {
             public Boolean played;
         }
 
-        public class Skin {
+        public static class Skin {
             public String id;
+
+            public URLs urls;
+            public class URLs {
+                public String mojang;
+                public String raw;
+                public String head;
+                public String body;
+                public String render;
+            }
+
             public String value;
             public String signature;
+
+            public SkinStatus status;
         }
 
-        public class Session {
+        public static class Session {
             public AddressDetails addressDetails;
             public Checks checks;
 
-            public class AddressDetails {
+            public static class AddressDetails {
                 public String continent_code;
                 public String continent_name;
                 public String country_iso_code;
@@ -38,18 +50,11 @@ public class MCSPlayerData {
                 public boolean is_in_european_union;
             }
 
-            public class Checks {
-                public Skin skin;
+            public static class Checks {
                 public Name name;
                 public VPN vpn;
                 public GMute gmute;
                 public GBan gban;
-
-                public class Skin {
-                    public String id;
-                    public String reason;
-                    public boolean block;
-                }
 
                 public class Name {
                     public String id;
@@ -84,19 +89,19 @@ public class MCSPlayerData {
                     public String timestamp;
                 }
 
-                public class Reason {
+                public static class Reason {
                     public String id;
                     public String text;
                 }
 
-                public class Proof {
+                public static class Proof {
                     public String type;
                     public String data;
                 }
             }
         }
 
-        public class CData {
+        public static class CData {
             public String id;
             public CDataType type;
             public String key;
@@ -106,9 +111,14 @@ public class MCSPlayerData {
         }
     }
 
-    public class System {
+    public static class System {
         public int status;
         public String message;
+    }
+
+    public enum SkinStatus {
+        NORMAL,
+        BLACKLISTED
     }
 
     public enum CDataType {
@@ -119,6 +129,7 @@ public class MCSPlayerData {
         INVENTORY,
         ITEMSTACK,
         MONEY,
-        TEXT
+        TEXT,
+        LOCATION
     }
 }

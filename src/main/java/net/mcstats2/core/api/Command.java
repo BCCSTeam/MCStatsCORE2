@@ -1,6 +1,7 @@
 package net.mcstats2.core.api;
 
 import com.google.common.base.Preconditions;
+import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSEntity.MCSEntity;
 
 import java.io.IOException;
@@ -23,7 +24,7 @@ public abstract class Command {
         this.aliases = aliases;
     }
 
-    public abstract void execute(MCSEntity var1, String[] var2) throws InterruptedException, ExecutionException, IOException;
+    public abstract void execute(MCSEntity e, String[] args) throws InterruptedException, ExecutionException, IOException;
 
     public String getName() {
         return this.name;
@@ -35,6 +36,10 @@ public abstract class Command {
 
     public String[] getAliases() {
         return this.aliases;
+    }
+
+    public MCSCore getCore() {
+        return MCSCore.getInstance();
     }
 
     public boolean equals(Object o) {

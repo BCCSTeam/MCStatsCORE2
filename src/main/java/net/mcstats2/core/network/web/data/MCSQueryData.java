@@ -1,11 +1,8 @@
 package net.mcstats2.core.network.web.data;
 
 import com.google.gson.annotations.SerializedName;
-import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.ChatColor;
-import net.mcstats2.core.network.web.data.task.MCSTask;
 import net.mcstats2.core.network.web.data.task.MCSTaskData;
-import net.mcstats2.core.network.web.data.task.MCSTaskType;
 
 import java.util.HashMap;
 import java.util.UUID;

@@ -2,7 +2,6 @@ package net.mcstats2.bridge.server.bukkit;
 
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import net.mcstats2.core.MCSCore;
 import net.mcstats2.core.api.MCSServer.MCSBukkitServer;
 import net.mcstats2.core.network.mysql.AsyncBukkitMySQL;
@@ -13,13 +12,17 @@ import net.mcstats2.core.exceptions.MCSError;
 import net.mcstats2.core.exceptions.MCSServerAuthFailed;
 import net.mcstats2.core.exceptions.MCSServerRegistrationFailed;
 import net.mcstats2.core.network.web.data.MCSFilterData;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Core extends JavaPlugin {
     private MCSCore mcs;
@@ -30,7 +33,6 @@ public class Core extends JavaPlugin {
 
     private Configuration config;
 
-    public JsonObject players = new JsonObject();
     public ArrayList<MCSFilterData> badwords = new ArrayList<>();
 
     @Override
@@ -65,7 +67,7 @@ public class Core extends JavaPlugin {
         }
 
         try {
-            MCSCore mcs = new MCSCore(getDataFolder(), new MCSBukkitServer(this), mysql.getMySQL());
+            mcs = new MCSCore(getFile(), getDataFolder(), config, new MCSBukkitServer(this), mysql.getMySQL());
         } catch (MCSError | MCSServerRegistrationFailed | IOException | ExecutionException | InterruptedException | MCSServerAuthFailed e) {
             e.printStackTrace();
         }
@@ -103,27 +105,23 @@ public class Core extends JavaPlugin {
             }
         }
 
-        getCommand("mcstats").setExecutor(new CommandManager());
+        getServer().getScheduler().runTaskLater(this, () -> {
+            for (String command : mcs.getCommands()) {
+                if (command == null)
+                    continue;
 
-        if (config.getBoolean("Modules.Kick.enabled"))
-            getCommand("kick").setExecutor(new CommandManager());
-
-        if (config.getBoolean("Modules.Mute.enabled")) {
-            getCommand("cmute").setExecutor(new CommandManager());
-            getCommand("mute").setExecutor(new CommandManager());
-            getCommand("unmute").setExecutor(new CommandManager());
-        }
-
-        if (config.getBoolean("Modules.Ban.enabled")) {
-            getCommand("cban").setExecutor(new CommandManager());
-            getCommand("ban").setExecutor(new CommandManager());
-            getCommand("unban").setExecutor(new CommandManager());
-        }
+                if (!getDescription().getCommands().containsKey(command)) {
+                    System.out.println("§cCommand " + command + " could not be registered!");
+                    continue;
+                }
+                Bukkit.getPluginCommand(command).setExecutor(new CommandManager());
+            }
+        }, 20);
     }
 
     @Override
     public void onDisable() {
-        mcs.end();
+        mcs.shutdown();
         mysql.getMySQL().closeConnection();
     }
 

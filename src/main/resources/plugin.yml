@@ -9,23 +9,23 @@ softdepend: [CloudNetAPI, TimoCloudAPI]
 
 main: net.mcstats2.bridge.server.bukkit.Core
 commands:
+  mcs:
   mcstats:
-    usage: </command>
-  info:
-    usage: </command>
+  tc:
+  team:
+  teamchat:
+  pi:
+  pinfo:
+  playerinfo:
   kick:
-    usage: </command>
-  mute:
-    usage: </command>
-  ban:
-    usage: </command>
-  cmute:
-    usage: </command>
-  cban:
-    usage: </command>
   unmute:
-    usage: </command>
   unban:
-    usage: </command>
+  mute:
+  ban:
+  cmute:
+  cban:
   alt:
-    usage: </command>
+  report:
+  reports:
+  goto:
+  jumpto:
