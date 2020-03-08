@@ -61,7 +61,7 @@ public class ChatFilter {
 
                 if (mute.getExpire() != 0) {
                     HashMap<String, Object> expires = new HashMap<>();
-                    long endsIn = Math.abs(mute.getExpire());
+                    long endsIn = Math.abs((System.currentTimeMillis() / 1000) - (mute.getExpire() + (mute.getTime() / 1000)));
                     long seconds = (endsIn) % 60;
                     long minutes = (endsIn / 60) % 60;
                     long hours = (endsIn / 60 / 60) % 24;

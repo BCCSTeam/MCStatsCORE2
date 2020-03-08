@@ -8,6 +8,7 @@ import net.mcstats2.core.api.MCSEntity.MCSConsole;
 import net.mcstats2.core.api.MCSEntity.MCSPlayer;
 import net.mcstats2.core.api.config.Configuration;
 import net.mcstats2.core.network.web.data.MCSPlayerData;
+import net.mcstats2.core.utils.StringUtils;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.PendingConnection;
@@ -19,6 +20,7 @@ import net.md_5.bungee.event.EventHandler;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.concurrent.ExecutionException;
 
@@ -61,18 +63,31 @@ public class PlayerJoin implements Listener {
                 replace.put("reason", ban.getCustomReason() == null ? (ban.getReason() != null ? ban.getReason().getText() : "err") : (ban.getCustomReason().isEmpty() ? "&8&o<none>&r" : ban.getCustomReason()));
 
                 if (ban.getExpire() != 0) {
+                    HashMap<String, Object> expires = new HashMap<>();
                     long endsIn = Math.abs((System.currentTimeMillis() / 1000) - (ban.getExpire() + (ban.getTime() / 1000)));
                     long seconds = (endsIn) % 60;
                     long minutes = (endsIn / 60) % 60;
                     long hours = (endsIn / 60 / 60) % 24;
                     long days = (endsIn / 60 / 60 / 24);
-                    replace.put("seconds", seconds);
-                    replace.put("minutes", minutes);
-                    replace.put("hours", hours);
-                    replace.put("days", days);
-                }
+                    expires.put("seconds", seconds);
+                    expires.put("minutes", minutes);
+                    expires.put("hours", hours);
+                    expires.put("days", days);
 
-                pp.disconnect(MCSCore.getInstance().buildScreen(lang, ban.getExpire() != 0 ? "ban.temp.screen" : "ban.perm.screen", replace));
+                    Timestamp end_timestamp = new Timestamp(ban.getTime() + (ban.getExpire()*1000));
+                    expires.put("end_year", end_timestamp.getYear());
+                    expires.put("end_month", end_timestamp.getMonth());
+                    expires.put("end_date", end_timestamp.getDate());
+                    expires.put("end_day", end_timestamp.getDay());
+                    expires.put("end_hours", end_timestamp.getHours());
+                    expires.put("end_minutes", end_timestamp.getMinutes());
+                    expires.put("end_seconds", end_timestamp.getSeconds());
+
+                    replace.put("expires", StringUtils.replace(player.getLang().getString("expires.temporary"), expires));
+                } else
+                    replace.put("expires", player.getLang().getString("expires.never"));
+
+                player.sendMessage(MCSCore.getInstance().buildScreen(lang, "ban.screen", replace));
                 return;
             }
 

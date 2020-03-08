@@ -17,6 +17,7 @@ import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.event.ChatEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 
 import java.io.File;
@@ -111,7 +112,7 @@ public class MCSBungeeServer implements MCSServer, Listener {
                     @Override
                     public String getWrapperId() {
                         if (isPluginEnabled("CloudNetAPI"))
-                            return CloudAPI.getInstance().getWrapperId();
+                            return CloudAPI.getInstance().getServiceId().getWrapperId();
 
                         if (isPluginEnabled("TimoCloudAPI"))
                             return TimoCloudAPI.getBungeeAPI().getThisProxy().getBase();
@@ -122,7 +123,7 @@ public class MCSBungeeServer implements MCSServer, Listener {
                     @Override
                     public String getGroup() {
                         if (isPluginEnabled("CloudNetAPI"))
-                            return CloudAPI.getInstance().getGroup();
+                            return CloudAPI.getInstance().getServiceId().getGroup();
 
                         if (isPluginEnabled("TimoCloudAPI"))
                             return TimoCloudAPI.getBungeeAPI().getThisProxy().getName();
@@ -133,7 +134,7 @@ public class MCSBungeeServer implements MCSServer, Listener {
                     @Override
                     public boolean isStatic() {
                         if (isPluginEnabled("CloudNetAPI"))
-                            return CloudAPI.getInstance().getProxyGroupData(CloudAPI.getInstance().getGroup()).getProxyGroupMode().equals(ProxyGroupMode.STATIC);
+                            return CloudAPI.getInstance().getProxyGroupData(CloudAPI.getInstance().getServiceId().getGroup()).getProxyGroupMode().equals(ProxyGroupMode.STATIC);
 
                         if (isPluginEnabled("TimoCloudAPI"))
                             return TimoCloudAPI.getBungeeAPI().getThisProxy().getGroup().isStatic();
@@ -192,6 +193,21 @@ public class MCSBungeeServer implements MCSServer, Listener {
     }
 
     @Override
+    public String getDisplayName(MCSPlayer player) {
+        if (isOnline(player)) {
+            ProxiedPlayer p = plugin.getProxy().getPlayer(player.getUUID());
+            assert p != null;
+
+            if (p.getDisplayName() == null)
+                return p.getName();
+
+            return p.getDisplayName();
+        }
+
+        return player.getName();
+    }
+
+    @Override
     public MCSPlayer[] getPlayers() {
         return plugin.getProxy().getPlayers().stream()
                 .map((player -> {
@@ -203,6 +219,14 @@ public class MCSBungeeServer implements MCSServer, Listener {
                     return null;
                 }))
                 .collect(Collectors.toList()).toArray(new MCSPlayer[0]);
+    }
+
+    @Override
+    public int getPing(MCSPlayer player) {
+        if (isOnline(player))
+            return plugin.getProxy().getPlayer(player.getUUID()).getPing();
+
+        return -1;
     }
 
     @Override
@@ -226,7 +250,7 @@ public class MCSBungeeServer implements MCSServer, Listener {
     @Override
     public boolean hasPermission(MCSPlayer player, String s) {
         if (isPluginEnabled("MCPerms"))
-            if (MCPerms.getInstance().getManager().hasPermission(player, s))
+            if (MCPerms.getInstance().getManager().hasPermission(player, s).isAllowed())
                 return true;
 
         if (!isOnline(player))

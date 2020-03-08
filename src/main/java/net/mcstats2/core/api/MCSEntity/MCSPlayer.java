@@ -1,6 +1,7 @@
 package net.mcstats2.core.api.MCSEntity;
 
 import net.mcstats2.core.MCSCore;
+import net.mcstats2.core.api.ChatColor;
 import net.mcstats2.core.api.chat.BaseComponent;
 import net.mcstats2.core.api.config.Configuration;
 import net.mcstats2.core.exceptions.MCSError;
@@ -8,6 +9,7 @@ import net.mcstats2.core.network.web.RequestResponse;
 import net.mcstats2.core.network.web.data.MCSPlayerData;
 import net.mcstats2.core.network.web.RequestBuilder;
 import net.mcstats2.core.utils.StringUtils;
+import net.md_5.bungee.protocol.packet.Chat;
 
 import java.io.IOException;
 import java.sql.ResultSet;
@@ -25,6 +27,14 @@ public class MCSPlayer implements MCSEntity {
 
     public UUID getUUID() {
         return UUID.fromString(data.response.UUID);
+    }
+
+    public String getDisplayName() {
+        return (isOnline() ? "" : ChatColor.GRAY) + MCSCore.getInstance().getServer().getDisplayName(this) + ChatColor.RESET;
+    }
+
+    public String getCustomName() {
+        return (isOnline() ? "" : ChatColor.GRAY) + MCSCore.getInstance().getServer().getCustomName(this) + ChatColor.RESET;
     }
 
     public String getName() {
@@ -122,6 +132,10 @@ public class MCSPlayer implements MCSEntity {
 
     public boolean isOnline() {
         return MCSCore.getInstance().getServer().isOnline(this);
+    }
+
+    public int getPing() {
+        return MCSCore.getInstance().getServer().getPing(this);
     }
 
     @Override

@@ -27,6 +27,7 @@ import net.mcstats2.core.utils.server.bukkit.tinyprotocol.TinyProtocol;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
+import org.bukkit.craftbukkit.v1_13_R2.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -94,12 +95,13 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
                     if (plugin.getServer().getPluginManager().isPluginEnabled("ViaVersion")) {
                         version = Via.getAPI().getPlayerVersion(pp.getUniqueId());
+
                     } else {
                         Object msf_ = msf.get(ep_);
                         Object sp = sp_.get(msf_);
                         Object sd = sd_.get(sp);
 
-                            version = Integer.getInteger(gpv.invoke(sd).toString());
+                        version = Integer.getInteger(gpv.invoke(sd).toString());
                     }
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -362,13 +364,16 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
             @Override
             public boolean isCloudSystem() {
-                if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                /*if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
                     return true;
 
                 if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                    return true;*/
+
+                if (isPluginEnabled("CloudNetAPI"))
                     return true;
 
-                return false;
+                return isPluginEnabled("TimoCloudAPI");
             }
 
             @Override
@@ -377,12 +382,13 @@ public class MCSBukkitServer implements MCSServer, Listener {
                     return null;
 
                 return new CloudDetails() {
+
                     @Override
                     public String getId() {
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                        if (getType().equals(CloudType.CLOUDNET))
                             return String.valueOf(CloudAPI.getInstance().getServiceId().getId());
 
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                        if (getType().equals(CloudType.TIMOCLOUD))
                             return TimoCloudAPI.getBukkitAPI().getThisServer().getId();
 
                         return plugin.getServer().getServerId();
@@ -390,10 +396,10 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
                     @Override
                     public String getWrapperId() {
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                        if (getType().equals(CloudType.CLOUDNET))
                             return CloudAPI.getInstance().getServiceId().getWrapperId();
 
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                        if (getType().equals(CloudType.TIMOCLOUD))
                             return TimoCloudAPI.getBukkitAPI().getThisServer().getBase();
 
                         return null;
@@ -401,10 +407,10 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
                     @Override
                     public String getGroup() {
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
-                            return CloudAPI.getInstance().getGroup();
+                        if (getType().equals(CloudType.CLOUDNET))
+                            return CloudAPI.getInstance().getServiceId().getGroup();
 
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                        if (getType().equals(CloudType.TIMOCLOUD))
                             return TimoCloudAPI.getBukkitAPI().getThisServer().getName();
 
                         if (plugin.getServer().getServerName().isEmpty())
@@ -415,12 +421,12 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
                     @Override
                     public boolean isStatic() {
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI")) {
-                            ServerGroupMode a = CloudAPI.getInstance().getServerGroup(CloudAPI.getInstance().getGroup()).getGroupMode();
+                        if (getType().equals(CloudType.CLOUDNET)) {
+                            ServerGroupMode a = CloudAPI.getInstance().getServerGroup(CloudAPI.getInstance().getServiceId().getGroup()).getGroupMode();
                             return a.equals(ServerGroupMode.STATIC) || a.equals(ServerGroupMode.STATIC_LOBBY);
                         }
 
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                        if (getType().equals(CloudType.TIMOCLOUD))
                             return TimoCloudAPI.getBukkitAPI().getThisServer().getGroup().isStatic();
 
                         return true;
@@ -428,10 +434,10 @@ public class MCSBukkitServer implements MCSServer, Listener {
 
                     @Override
                     public CloudType getType() {
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("CloudNetAPI"))
+                        if (isPluginEnabled("CloudNetAPI"))
                             return CloudType.CLOUDNET;
 
-                        if (plugin.getServer().getPluginManager().isPluginEnabled("TimoCloudAPI"))
+                        if (isPluginEnabled("TimoCloudAPI"))
                             return CloudType.TIMOCLOUD;
 
                         return null;
@@ -479,6 +485,36 @@ public class MCSBukkitServer implements MCSServer, Listener {
     }
 
     @Override
+    public String getDisplayName(MCSPlayer player) {
+        if (isOnline(player)) {
+            Player p = plugin.getServer().getPlayer(player.getUUID());
+            assert p != null;
+
+            if (p.getDisplayName().isEmpty())
+                return p.getName();
+
+            return p.getDisplayName();
+        }
+
+        return player.getName();
+    }
+
+    @Override
+    public String getCustomName(MCSPlayer player) {
+        if (isOnline(player)) {
+            Player p = plugin.getServer().getPlayer(player.getUUID());
+            assert p != null;
+
+            if (p.getCustomName() == null || p.getCustomName().isEmpty())
+                return p.getName();
+
+            return p.getCustomName();
+        }
+
+        return player.getName();
+    }
+
+    @Override
     public MCSPlayer[] getPlayers() {
         return plugin.getServer().getOnlinePlayers().stream()
                 .map((player -> {
@@ -490,6 +526,24 @@ public class MCSBukkitServer implements MCSServer, Listener {
                     return null;
                 }))
                 .collect(Collectors.toList()).toArray(new MCSPlayer[0]);
+    }
+
+    @Override
+    public int getPing(MCSPlayer player) {
+        if (!isOnline(player))
+            return -1;
+
+        Player p = plugin.getServer().getPlayer(player.getUUID());
+
+        try {
+            Reflection.FieldAccessor<Integer> ping = Reflection.getField(ep, "ping", int.class);
+            return ping.get(getHandle.invoke(p));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+
+        return -1;
     }
 
     @Override
@@ -513,7 +567,7 @@ public class MCSBukkitServer implements MCSServer, Listener {
     @Override
     public boolean hasPermission(MCSPlayer player, String s) {
         if (plugin.getServer().getPluginManager().isPluginEnabled("MCPerms"))
-            if (MCPerms.getInstance().getManager().hasPermission(player, s))
+            if (MCPerms.getInstance().getManager().hasPermission(player, s).isAllowed())
                 return true;
 
         if (!isOnline(player))
@@ -634,5 +688,14 @@ public class MCSBukkitServer implements MCSServer, Listener {
             e.printStackTrace();
         }
         return null;
+    }
+
+    private boolean isPluginEnabled(String name) {
+        for (Plugin plugin : plugin.getServer().getPluginManager().getPlugins()) {
+            if (plugin.getDescription().getName().equalsIgnoreCase(name))
+                return true;
+        }
+
+        return false;
     }
 }

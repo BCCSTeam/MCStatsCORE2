@@ -28,6 +28,7 @@ actions:
   logins: ''
   chatlogs: ''
 
+ping: '&7Your current ping is &e%ping%ms&7!'
 
 playerInfo:
   details:

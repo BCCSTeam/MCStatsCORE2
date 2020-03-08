@@ -23,8 +23,6 @@ public class MCStatsChatUploader implements ChatUploader {
             ex.printStackTrace();
         }
     }
-
-
 }
 
 

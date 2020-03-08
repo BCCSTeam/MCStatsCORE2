@@ -740,7 +740,8 @@ public class MCSCore {
 
     public RequestBuilder getAuthedRequest(String path) {
         RequestBuilder rb = new RequestBuilder(API_SERVER + GUID + (path.startsWith("/") ? "" : "/") + path);
-        rb.putHeader("Auth-Instance", instanceID);
+        if (instanceID != null)
+            rb.putHeader("Auth-Instance", instanceID);
         rb.putHeader("Auth-Secret", Secret);
         rb.putHeader("API-Parser-Version", API_PARSER_VERSION.getOriginalString());
 
@@ -835,6 +836,8 @@ public class MCSCore {
         registerCommand(new PlayerInfo("pi"));
         registerCommand(new PlayerInfo("pinfo"));
         registerCommand(new PlayerInfo("playerinfo"));
+
+        registerCommand(new Ping("ping"));
 
         registerCommand(new Kick("kick"));
 
